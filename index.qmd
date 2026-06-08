@@ -1,0 +1,45 @@
+---
+title: "Population Genetics"
+subtitle: "Foundations of Genetic Variation and Evolutionary Change"
+---
+
+## Course Overview
+
+This course introduces the principles used to describe genetic variation within and among populations. It examines allele and genotype frequencies, Hardy-Weinberg equilibrium, mating systems, genetic drift, migration, mutation, selection, linkage disequilibrium, and population history.
+
+## Learning Objectives
+
+After completing the course, students should be able to:
+
+- Describe genetic variation using allele, genotype, and haplotype frequencies.
+- Explain and apply the Hardy-Weinberg principle.
+- Explain how mutation, migration, drift, recombination, and selection affect populations.
+- Interpret inbreeding, linkage disequilibrium, and population structure.
+- Connect population-genetics models with biological and genomic applications.
+
+## Prerequisites
+
+- Basic genetics and Mendelian inheritance
+- Introductory probability and statistics
+- Basic familiarity with R
+
+## Course Materials
+
+- [Population Genetics slides](slides/introduction_population_genetics.html)
+- [Narrated Population Genetics slides](slides/introduction_population_genetics_narrated.html)
+
+## Interactive Apps
+
+The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.
+
+- [Genetic drift simulation](apps/drift_simulation.R)
+- [Gene pool and Hardy-Weinberg simulator](apps/GenePool_HWE_Simulator.R)
+- [Hardy-Weinberg simulation](apps/hwe_simulation.R)
+- [Hardy-Weinberg test simulator](apps/HWE_Test_Simulator.R)
+- [Migration and admixture simulator](apps/Migration_Admixture_Simulator.R)
+- [Selection simulator](apps/Selection_Simulator.R)
+- [Selective sweep simulator](apps/Selective_Sweep_Simulator.R)
+
+## Course Hub
+
+Return to the [qgteach teaching-materials hub](https://psoerensen.github.io/qgteach/).
