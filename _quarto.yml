@@ -12,6 +12,7 @@ project:
     - tutorials/selection_fitness.qmd
     - tutorials/testing_hwe.qmd
     - tutorials/mutation_balance.qmd
+    - tutorials/conservation_genetics.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -48,6 +49,8 @@ website:
             href: tutorials/testing_hwe.html
           - text: "9. Mutation, selection and drift at balance"
             href: tutorials/mutation_balance.html
+          - text: "10. Conservation genetics"
+            href: tutorials/conservation_genetics.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

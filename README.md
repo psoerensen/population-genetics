@@ -34,6 +34,10 @@ slides/introduction_population_genetics.qmd
 slides/introduction_population_genetics_narrated.qmd
 ```
 
+## Conservation practical
+
+[Tutorial 10](tutorials/conservation_genetics.qmd) compares parental contributions, mating, expected inbreeding and marker heterozygosity under a hypothetical budget. It uses base R and requires no downloads.
+
 ## Included Apps
 
 The repository includes these R/Shiny app source files:

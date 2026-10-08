@@ -1,0 +1,229 @@
+---
+title: "Conservation genetics and management choices"
+subtitle: "Population Genetics Practical 10: Diversity, kinship and a limited budget"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Compare parental contributions and mating arrangements; calculate expected offspring inbreeding and marker heterozygosity; distinguish these from parental group coancestry; and choose among specified plans under a resource constraint.
+
+Read [structure and inbreeding](structure_mating_inbreeding.qmd), [diversity](genetic_diversity.qmd) and [drift](genetic_drift.qmd) first. This practical connects their ideas to the slides on conservation genetics. All animals, genotypes and costs below are hypothetical. The calculations describe one generation and do not predict population viability or fitness.
+
+## 1. Specify the candidate parents and ancestral base
+
+There are two male and two female candidates. M1 and F1 are full siblings from one pair of unrelated, noninbred founders. M2 and F2 are full siblings from another founder pair. All four founders are mutually unrelated. Each candidate therefore has inbreeding coefficient zero, while full siblings have kinship $1/4$.
+
+Kinship $\phi_{ij}$ is the probability that an allele drawn from individual $i$ and one drawn from $j$ are identical by descent on this ancestral base. Its diagonal is $(1+F_i)/2$. The additive relationship matrix is $A=2\phi$. Expected inbreeding in a child is the kinship between its parents:
+
+$$F_{\mathrm{child}}=\phi_{\mathrm{sire,dam}}.$$
+
+[QG Practical 9](https://psoerensen.github.io/quantitative-genetics/tutorials/relationships_mating_inbreeding.html) derives relationships from pedigrees. Here the small matrix is supplied directly, so no sibling repository or extra R package is required.
+
+```{r}
+#| label: candidate-kinship
+ids <- c("M1", "M2", "F1", "F2")
+phi <- diag(0.5, 4)
+dimnames(phi) <- list(ids, ids)
+phi["M1", "F1"] <- phi["F1", "M1"] <- 0.25
+phi["M2", "F2"] <- phi["F2", "M2"] <- 0.25
+stopifnot(isSymmetric(phi), min(eigen(phi, symmetric=TRUE)$values) > 0)
+phi
+```
+
+The matrix describes pedigree identity by descent. A similarity matrix computed from four markers would represent a different quantity and reference.
+
+## 2. Keep contributions fixed and change pairings
+
+Each plan produces eight offspring. Within-family mating pairs full siblings; between-family mating pairs unrelated candidates. A mixed plan uses both types.
+
+```{r}
+#| label: mating-plans
+plans <- list(
+  Within = data.frame(sire=rep(c("M1","M2"), each=4),
+                      dam=rep(c("F1","F2"), each=4)),
+  Between = data.frame(sire=rep(c("M1","M2"), each=4),
+                       dam=rep(c("F2","F1"), each=4)),
+  Mixed = data.frame(sire=rep(c("M1","M1","M2","M2"), each=2),
+                     dam=rep(c("F1","F2","F1","F2"), each=2))
+)
+contributions <- function(plan) {
+  as.numeric(table(factor(c(plan$sire,plan$dam), levels=ids))) /
+    (2*nrow(plan))
+}
+C <- t(vapply(plans, contributions, numeric(4)))
+colnames(C) <- ids
+stopifnot(all(abs(C-0.25)<1e-12), all(abs(rowSums(C)-1)<1e-12))
+C
+```
+
+Each parent supplies four of the sixteen parental slots, giving expected genetic contribution $c_i=1/4$. This is an expectation over Mendelian transmission; realized contributions at individual loci can differ.
+
+```{r}
+#| label: offspring-inbreeding
+mean_F <- vapply(plans, function(plan) {
+  mean(phi[cbind(match(plan$sire,ids), match(plan$dam,ids))])
+}, numeric(1))
+stopifnot(max(abs(mean_F-c(0.25,0,0.125)))<1e-12)
+barplot(mean_F, ylim=c(0,0.3), ylab="Mean expected offspring inbreeding",
+        col=c("#d95f02","#1b9e77","#7570b3"))
+```
+
+**Interpretation question.** Why does equal use of the same four parents not determine offspring inbreeding?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Contributions count how often each parent is used. Inbreeding depends on which parents are paired. The within-family, between-family and mixed plans have mean expected offspring inbreeding 0.25, 0 and 0.125 respectively.
+:::
+
+## 3. Separate allele diversity from heterozygous genotypes
+
+Supply four hypothetical biallelic markers. Dosage counts the B allele, with AA=0, AB=1 and BB=2. These are complete, known parental genotypes, rather than an HWE sample.
+
+```{r}
+#| label: parental-markers
+D <- cbind(marker1=c(2,0,2,0), marker2=c(1,1,1,1),
+           marker3=c(2,1,0,1), marker4=c(0,2,0,2))
+rownames(D) <- ids
+D
+```
+
+For a specified parental contribution vector, expected offspring B frequency is $p_B=\sum_i c_i d_i/2$. The frequency-based diversity measure $H_E=2p_B(1-p_B)$ describes random union at that frequency.
+
+For a particular mating, let $p_s=d_s/2$ and $p_d=d_d/2$. Mendelian transmission gives the heterozygous-child probability
+
+$$P(AB\mid d_s,d_d)=p_s(1-p_d)+(1-p_s)p_d.$$
+
+This is conditional on the known parents and mating arrangement. It need not equal the random-union expectation.
+
+```{r}
+#| label: expected-marker-variation
+expected_p <- C %*% (D/2)
+expected_HE <- 2*expected_p*(1-expected_p)
+expected_HO <- t(vapply(plans, function(plan) {
+  ps <- D[plan$sire,,drop=FALSE]/2
+  pd <- D[plan$dam,,drop=FALSE]/2
+  colMeans(ps*(1-pd)+(1-ps)*pd)
+}, numeric(ncol(D))))
+colnames(expected_HO) <- colnames(D)
+stopifnot(all(abs(expected_p-0.5)<1e-12),
+          max(abs(rowMeans(expected_HO)-c(0.3125,0.75,0.53125)))<1e-12)
+data.frame(plan=names(plans), mean_HE=rowMeans(expected_HE),
+           expected_heterozygous_fraction=rowMeans(expected_HO),
+           mean_offspring_F=mean_F, row.names=NULL)
+```
+
+The between-family plan has expected heterozygous fraction 0.75 across this panel, although $H_E=0.5$ for every marker. Pairing opposite homozygotes can make all offspring heterozygous at a marker. This does not violate the maximum of 0.5 for the *random-union* two-allele expression.
+
+Do not convert this small panel's heterozygous fraction into pedigree inbreeding. Marker states describe identity by state; pedigree kinship describes identity by descent. Neither calculation here estimates genome-wide diversity from real samples.
+
+## 4. Measure concentration and group coancestry
+
+The effective number of contributors $1/\sum_i c_i^2$ is a concentration descriptor. It equals four when four parents contribute equally. It is not an estimate of effective population size $N_e$.
+
+Group coancestry is
+
+$$\Theta=\sum_i\sum_j c_i c_j\phi_{ij}=c^\mathsf{T}\phi c.$$
+
+It is the expected kinship of two parental identities sampled independently with probabilities $c_i$. Sampling is with replacement, so the diagonal contributes. This quantity uses contributions and the kinship matrix, while immediate offspring inbreeding also uses the mating arrangement.
+
+```{r}
+#| label: contribution-summary
+contributors <- 1/rowSums(C^2)
+group_coancestry <- rowSums((C %*% phi)*C)
+stopifnot(all(abs(contributors-4)<1e-12),
+          all(abs(group_coancestry-0.1875)<1e-12))
+data.frame(plan=names(plans), contributors, group_coancestry,
+           mean_offspring_F=mean_F, row.names=NULL)
+```
+
+All three plans have the same group coancestry. Avoiding related pairings reduces immediate offspring inbreeding without changing this parental contribution measure. It does not establish that future generations will retain the same diversity.
+
+**Exercise.** Use only M1 and F1, each with contribution 0.5. Calculate the concentration descriptor and group coancestry. Which founder family disappears from the plan?
+
+::: {.callout-note collapse="true" title="Solution"}
+```{r}
+c_small <- c(0.5,0,0.5,0)
+c(contributors=1/sum(c_small^2),
+  group_coancestry=drop(t(c_small) %*% phi %*% c_small))
+```
+The effective number of contributors is two and group coancestry is 0.375. Founder family B is no longer represented. This describes the chosen contributions, not a population-size estimate or a forecast of extinction.
+:::
+
+## 5. Make the resource constraint explicit
+
+Suppose offspring upkeep costs two units per child. Each between-family offspring also costs one unit for coordination. These invented costs illustrate a decision rule: **among these three equal-contribution plans, minimize mean expected offspring inbreeding within the budget**.
+
+```{r}
+#| label: constrained-plan-choice
+family <- setNames(c("A","B","A","B"), ids)
+cost <- vapply(plans, function(plan) {
+  2*nrow(plan)+sum(family[plan$sire]!=family[plan$dam])
+}, numeric(1))
+comparison <- data.frame(plan=names(plans), cost,
+                         mean_offspring_F=mean_F,
+                         group_coancestry, row.names=NULL)
+choose_plan <- function(budget) {
+  feasible <- comparison[comparison$cost<=budget,,drop=FALSE]
+  if (!nrow(feasible)) return(feasible)
+  feasible[which.min(feasible$mean_offspring_F),,drop=FALSE]
+}
+stopifnot(choose_plan(20)$plan=="Mixed", choose_plan(24)$plan=="Between",
+          nrow(choose_plan(15))==0)
+comparison
+choose_plan(20)
+```
+
+At budget 20, the mixed plan is the best of the three feasible alternatives for the declared objective. At budget 24, the between-family plan is feasible and has zero expected offspring inbreeding on the specified base. Minimizing group coancestry alone would give a tie among all three plans.
+
+This comparison enumerates supplied alternatives; it does not find a global optimum over every possible contribution and mating schedule. A real planning problem needs its own candidate information, welfare and reproductive constraints, costs and objective.
+
+## 6. Connect the one-generation decision to drift
+
+Under an idealized neutral diploid population with constant supplied $N_e$, no mutation or migration, expected allele diversity decays as
+
+$$H_t/H_0=\left(1-\frac{1}{2N_e}\right)^t.$$
+
+This is the model from [Practical 6](genetic_drift.qmd). The following scenarios do not infer $N_e$ from our four parents or their concentration descriptor.
+
+```{r}
+#| label: diversity-retention-scenarios
+Ne <- c(10,50,100)
+time <- 0:20
+retention <- sapply(Ne, function(n) (1-1/(2*n))^time)
+matplot(time, retention, type="l", lty=1, lwd=2,
+        col=c("#d95f02","#1b9e77","#7570b3"),
+        xlab="Generation", ylab="Expected diversity relative to generation 0")
+legend("bottomleft", legend=paste("Supplied Ne =",Ne), lty=1, lwd=2,
+       col=c("#d95f02","#1b9e77","#7570b3"), bty="n")
+```
+
+A low immediate offspring inbreeding value and sustained diversity are different targets. This practical contains no deleterious-allele fitness model, so its results cannot compare purging, genetic load or demographic recovery. [Practical 9](mutation_balance.qmd) explains how mutation and selection assumptions affect equilibrium arguments.
+
+## Exercises and discussion
+
+1. Change the budget to 16 and explain the selected plan.
+2. Report each plan's expected heterozygous fraction for marker 1. Explain the result from the four parental genotypes.
+3. Give an example in which reducing offspring inbreeding leaves group coancestry unchanged.
+4. State what information is missing before comparing long-term population viability.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+choose_plan(16)
+expected_HO[,"marker1"]
+```
+Only the within-family plan is feasible at budget 16. Marker 1 heterozygous probabilities are 0, 1 and 0.5 for within-family, between-family and mixed plans. Changing within-family to between-family pairings preserves the contribution vector and group coancestry. Long-term viability requires reproductive and demographic dynamics, environmental conditions and a model connecting genotypes to fitness, as well as uncertainty in the inputs.
+:::
+
+## Package connections and next steps
+
+These base R examples expose quantities relevant to `gpop` population summaries and `gsel` management objectives. They do not assume an exported optimizer from either package. `gsim` supplies inheritance and parentage mechanics when extending a specified plan to simulated offspring; pedigree or genomic inference requires its own appropriate method and reference base.
+
+For a larger teaching comparison, read [QG Practical 11: Comparing breeding programmes](https://psoerensen.github.io/quantitative-genetics/tutorials/comparing_breeding_programmes.html), keeping the objective, horizon and resource accounting explicit.
