@@ -34,6 +34,7 @@ After completing the course, students should be able to:
 
 ## Course Materials
 
+- [Shared course map](https://psoerensen.github.io/quantitative-genetics/tutorials/course_map.html) — topic overview and learning routes across Population Genetics and Quantitative Genetics.
 - [Population Genetics slides](slides/introduction_population_genetics.html)
 - [Narrated Population Genetics slides](slides/introduction_population_genetics_narrated.html)
 

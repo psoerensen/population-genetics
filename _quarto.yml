@@ -30,6 +30,8 @@ website:
     left:
       - text: "Home"
         href: index.html
+      - text: "Course map"
+        href: https://psoerensen.github.io/quantitative-genetics/tutorials/course_map.html
       - text: "Slides"
         href: slides/introduction_population_genetics.html
       - text: "Narrated slides"
