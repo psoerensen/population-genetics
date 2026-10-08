@@ -1,0 +1,240 @@
+---
+title: "Testing Hardy–Weinberg proportions"
+subtitle: "Population Genetics Practical 8: Fitted expectations, sparse counts and exact inference"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Fit HWE expectations from genotype counts; explain the chi-square test's degrees of freedom; compare approximate and exact inference; state an exact test's two-sided convention; and interpret rejection without claiming a biological cause.
+
+Read after [Practical 2](allele_frequencies_hwe.qmd), alongside the slides on [HWE testing](../slides/introduction_population_genetics.qmd#hardyweinberg-test-theory-and-example) and the [chi-square test](../slides/introduction_population_genetics.qmd#the-chi-square-test-for-hardyweinberg-equilibrium). [Practical 3](structure_mating_inbreeding.qmd) supplies the distinction between structure, mating and inbreeding. All inputs here are hypothetical, and all calculations use base R.
+
+## 1. State the sampling model and null hypothesis
+
+We study one diploid biallelic autosomal locus with accurately called AA, AB and BB genotypes. The sample consists of independent individuals from a declared population, without outcome-dependent ascertainment. Missing calls are excluded and their denominator reported. Relatives, pooled populations, uncertain genotype calls or sex-linked inheritance require a different model or analysis.
+
+The null is that genotype probabilities follow $p_A^2,2p_A(1-p_A),(1-p_A)^2$ for some population allele frequency. A test compares counts with this model; it does not test every mechanism associated with random mating or identify why a departure occurred.
+
+```{r}
+#| label: counts-and-expectations
+validate_counts <- function(counts) {
+  stopifnot(is.numeric(counts),length(counts)==3,!is.null(names(counts)),
+    !anyDuplicated(names(counts)),setequal(names(counts),c("AA","AB","BB")),
+    all(is.finite(counts)),all(counts>=0),all(counts==floor(counts)),
+    sum(counts)>0,sum(counts)<=1000)
+  counts[c("AA","AB","BB")]
+}
+hwe_summary <- function(counts) {
+  counts <- validate_counts(counts)
+  n <- sum(counts)
+  pA <- (2*counts["AA"]+counts["AB"])/(2*n)
+  expected <- n*c(AA=unname(pA)^2,AB=2*unname(pA)*(1-unname(pA)),
+                   BB=(1-unname(pA))^2)
+  list(counts=counts,n=n,pA=unname(pA),expected=expected)
+}
+counts <- c(AA=48,AB=36,BB=16)
+s <- hwe_summary(counts)
+stopifnot(s$n==100,abs(s$pA-.66)<1e-12,
+          max(abs(s$expected-c(43.56,44.88,11.56)))<1e-12)
+knitr::kable(data.frame(genotype=names(counts),observed=counts,
+                       fitted_expected=s$expected),digits=2,row.names=FALSE)
+```
+
+The helper requires named nonnegative integer counts and caps this teaching example at 1,000 individuals. It is not a production testing interface. Fractional expected counts are valid; fractional observed genotype counts are not supported here.
+
+## 2. Calculate a chi-square approximation
+
+For positive fitted expectations,
+
+$$X^2=\sum_{g\in\{AA,AB,BB\}}\frac{(O_g-E_g)^2}{E_g}.$$
+
+Three category counts have two free proportions because they sum to the sample size. Estimating one allele-frequency parameter from the same sample leaves $3-1-1=1$ degree of freedom. This is an asymptotic approximation, particularly questionable when an expected genotype count is small.
+
+```{r}
+#| label: chi-square-test
+hwe_chisq <- function(counts) {
+  s <- hwe_summary(counts)
+  if(any(s$expected==0)) {
+    return(c(statistic=NA_real_,df=NA_real_,p_value=NA_real_))
+  }
+  statistic <- sum((s$counts-s$expected)^2/s$expected)
+  c(statistic=unname(statistic),df=1,
+    p_value=pchisq(statistic,df=1,lower.tail=FALSE))
+}
+chi <- hwe_chisq(counts)
+chi
+# A generic goodness-of-fit call treats supplied probabilities as fixed.
+generic <- suppressWarnings(chisq.test(counts,p=s$expected/s$n))
+stopifnot(abs(unname(generic$statistic)-chi["statistic"])<1e-12,
+          unname(generic$parameter)==2)
+```
+
+The generic call gives the same statistic but uses two degrees of freedom, because it does not know that those probabilities were fitted from these counts. Its default p-value therefore does not implement this fitted HWE test. No continuity correction is used in our calculation.
+
+**Question 1.** What if allele frequency were genuinely specified before sampling?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Then the three genotype probabilities would be fully specified, with two degrees of freedom in a regular goodness-of-fit approximation. That tests a particular allele frequency as well as HWE proportions. It is a different null from fitting allele frequency within the current sample.
+:::
+
+## 3. Enumerate an exact conditional distribution
+
+Condition on sample size $n$ and the observed number $K$ of B copies. For a possible heterozygote count $h$,
+
+$$n_{BB}=(K-h)/2,\qquad n_{AA}=n-h-n_{BB}.$$
+
+Only nonnegative integer configurations are allowed. Under the independent-individual HWE model, their conditional probabilities are
+
+$$P(h\mid n,K)=
+\frac{n!\,2^h}{n_{AA}!\,h!\,n_{BB}!\,\binom{2n}{K}}.$$
+
+The factor $2^h$ accounts for the two orders of unlike alleles in each heterozygote. Conditioning removes the unknown allele-frequency parameter. We define a **probability-ordered two-sided p-value** as the sum of probabilities of configurations no more probable than the observed configuration, including ties. This is not a mid-p test or a doubled one-sided tail. For exact-test conventions and efficient algorithms, see [Wigginton, Cutler and Abecasis (2005)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1199378/).
+
+```{r}
+#| label: exact-conditional-test
+hwe_exact <- function(counts) {
+  counts <- validate_counts(counts)
+  n <- sum(counts); K <- unname(counts["AB"]+2*counts["BB"])
+  h <- seq.int(K %% 2,min(K,2*n-K),by=2)
+  BB <- (K-h)/2; AA <- n-h-BB
+  log_probability <- lgamma(n+1)+h*log(2)-lgamma(AA+1)-
+    lgamma(h+1)-lgamma(BB+1)-lchoose(2*n,K)
+  probability <- exp(log_probability)
+  stopifnot(abs(sum(probability)-1)<1e-10)
+  probability <- probability/sum(probability) # Floating-point normalization.
+  observed <- match(unname(counts["AB"]),h)
+  included <- log_probability<=log_probability[observed]+1e-10
+  p_value <- min(1,sum(probability[included]))
+  list(p_value=p_value,n=n,B_copies=K,
+       distribution=data.frame(AA=AA,AB=h,BB=BB,probability=probability,
+                               included_in_p_value=included))
+}
+exact <- hwe_exact(counts)
+exact$p_value
+knitr::kable(exact$distribution,digits=5,row.names=FALSE)
+```
+
+The log-factorial calculation avoids direct factorial overflow. Enumeration is intentionally small and transparent; no package implementation is copied or added.
+
+### Check against allele-position enumeration
+
+For five individuals and four B copies, enumerate all choices of four positions among ten labelled gene-copy positions. Each choice is equally likely conditional on the allele count. Pair adjacent positions to recover genotypes and compare the heterozygote distribution.
+
+```{r}
+#| label: exact-oracle
+small <- hwe_exact(c(AA=2,AB=2,BB=1))
+positions <- combn(10,4)
+heterozygotes <- apply(positions,2,function(chosen) {
+  alleles <- integer(10); alleles[chosen] <- 1L
+  dosage <- colSums(matrix(alleles,nrow=2))
+  sum(dosage==1)
+})
+frequency <- table(factor(heterozygotes,levels=small$distribution$AB))/ncol(positions)
+stopifnot(max(abs(as.numeric(frequency)-small$distribution$probability))<1e-12,
+          small$p_value==1)
+knitr::kable(small$distribution,digits=4,row.names=FALSE)
+```
+
+This checks the conditional distribution independently of the log-factorial formula. It does not verify sampling assumptions in a real dataset.
+
+## 4. Compare dense, sparse and monomorphic counts
+
+```{r}
+#| label: test-comparison
+examples <- list(Moderate=c(AA=48,AB=36,BB=16),
+                 Sparse=c(AA=8,AB=1,BB=1),
+                 Monomorphic=c(AA=10,AB=0,BB=0))
+comparison <- do.call(rbind,lapply(names(examples),function(label) {
+  counts <- examples[[label]]; s <- hwe_summary(counts)
+  data.frame(example=label,n=s$n,min_expected=min(s$expected),
+    chi_square_p=unname(hwe_chisq(counts)["p_value"]),
+    exact_p=hwe_exact(counts)$p_value)
+}))
+stopifnot(abs(comparison$exact_p[comparison$example=="Sparse"]-3/19)<1e-12,
+          comparison$exact_p[comparison$example=="Monomorphic"]==1)
+knitr::kable(comparison,digits=4,row.names=FALSE)
+```
+
+The sparse example has a fitted minor-homozygote expectation below one, and the approximate and exact p-values differ. No universal expected-count rule guarantees approximation quality. In the monomorphic sample the conditional distribution has one configuration and p-value one; the fitted chi-square calculation is undefined. This reflects no conditional information about departure, not proof that the population satisfies HWE.
+
+```{r}
+#| label: fig-conditional-distribution
+#| fig-cap: "Only two genotype configurations are possible for ten individuals with three B copies. The observed sparse configuration has one heterozygote."
+#| fig-width: 7
+#| fig-height: 4
+sparse <- hwe_exact(examples$Sparse)
+barplot(setNames(sparse$distribution$probability,sparse$distribution$AB),
+        col=c("#D8A47F","#247BA0"),xlab="Possible heterozygote count",
+        ylab="Conditional HWE probability",ylim=c(0,1))
+```
+
+### Discrete p-values and attainable rejection
+
+An exact probability-ordered test can have only a few attainable p-values. Evaluate the test on every configuration for this sparse conditional distribution. Its null rejection probability at level 0.05 is zero because neither configuration reaches that threshold.
+
+```{r}
+#| label: conditional-size
+support <- sparse$distribution
+p_values <- vapply(seq_len(nrow(support)),function(i)
+  hwe_exact(c(AA=support$AA[i],AB=support$AB[i],BB=support$BB[i]))$p_value,
+  numeric(1))
+alpha <- .05
+conditional_rejection_probability <- sum(support$probability[p_values<=alpha])
+stopifnot(conditional_rejection_probability==0)
+knitr::kable(data.frame(support[,1:4],p_value=p_values),digits=4,row.names=FALSE)
+```
+
+Non-rejection is compatible with limited power. The test's exactness is conditional on its sampling model; it does not repair population pooling, relatives or erroneous calls.
+
+## 5. Interpret a departure without naming its cause
+
+Population structure, nonrandom mating, selection or technical calling errors can produce departures from the tested proportions. Which mechanism applies needs additional information. Sampling relatives can also invalidate the independent-individual null distribution even when marginal genotype proportions match.
+
+A hypothetical population mixture has two equal groups with HWE counts corresponding to allele frequencies 0.9 and 0.1. Within-group counts fit their models exactly, but pooled counts do not fit the random-union model at frequency 0.5.
+
+```{r}
+#| label: population-pooling
+population1 <- c(AA=81,AB=18,BB=1)
+population2 <- c(AA=1,AB=18,BB=81)
+pooled <- population1+population2
+stopifnot(hwe_chisq(population1)["statistic"]<1e-25,
+          hwe_chisq(population2)["statistic"]<1e-25,
+          hwe_exact(pooled)$p_value<.05)
+knitr::kable(data.frame(group=c("Population 1","Population 2","Pooled"),
+  exact_p=c(hwe_exact(population1)$p_value,hwe_exact(population2)$p_value,
+            hwe_exact(pooled)$p_value)),digits=5,row.names=FALSE)
+```
+
+These supplied counts illustrate pooling; they are not independent simulated draws or evidence about real mating. A low pooled p-value would not identify individual pedigree inbreeding. Conversely, a high p-value is not the posterior probability that HWE is true.
+
+## Exercises
+
+1. Reverse AA and BB counts and verify both test results stay unchanged.
+2. Multiply the moderate counts by five. Explain why identical genotype proportions need not give the same p-value.
+3. State what must be reported before using HWE test results as a marker-quality filter across many loci.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+counts <- examples$Moderate
+reversed <- setNames(rev(counts),names(counts))
+stopifnot(abs(hwe_exact(reversed)$p_value-hwe_exact(counts)$p_value)<1e-12,
+  abs(hwe_chisq(reversed)["statistic"]-hwe_chisq(counts)["statistic"])<1e-12,
+  abs(hwe_chisq(5*counts)["statistic"]-5*hwe_chisq(counts)["statistic"])<1e-12)
+```
+At fixed proportions the chi-square statistic scales with sample size, so more observations can provide stronger evidence against the same departure. Report the population and locus definitions, called sample size, genotype counts, missingness, relatedness/ascertainment rules, test convention and threshold. For many markers, specify the multiple-testing or quality-control policy and investigate technical and biological explanations. A threshold alone is not a universal reason to discard every departing locus.
+:::
+
+## App and package connections
+
+The existing [HWE test Shiny source](../apps/HWE_Test_Simulator.R) is available for optional local exploration with its existing dependencies; this practical does not modify or qualify it. `gpop` owns population summaries and estimator assumptions. The base-R enumeration here is a teaching calculation, not an exported `gpop` method.
+
+Return to [population structure and inbreeding](structure_mating_inbreeding.qmd) for interpretation or the [course map](https://psoerensen.github.io/quantitative-genetics/tutorials/course_map.html) for teaching routes. The next extension is a worked association analysis with covariates, multiple testing and cautious causal interpretation.
