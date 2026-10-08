@@ -5,6 +5,8 @@
 
 - [Population structure, mating and inbreeding](structure_mating_inbreeding.qmd): Practical 3, contrasting mating rules, IBD and population mixtures.
 
+- [Measuring genetic diversity](genetic_diversity.qmd): Practical 4, heterozygosity, finite-sample correction and nucleotide diversity.
+
 All use base R and hypothetical data, with no required downloads or package installations. gpop links refer to its existing teaching examples, not proposed scientific APIs.
 
 Render an individual page from the repository root:

@@ -35,6 +35,8 @@ After completing the course, students should be able to:
 
 - [Practical 3: Population structure, mating and inbreeding](tutorials/structure_mating_inbreeding.qmd) — mating rules, identity by descent and population-mixture effects.
 
+- [Practical 4: Measuring genetic diversity](tutorials/genetic_diversity.qmd) — heterozygosity, sample correction and nucleotide diversity.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

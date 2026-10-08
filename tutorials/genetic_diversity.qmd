@@ -1,0 +1,226 @@
+---
+title: "Measuring genetic diversity"
+subtitle: "Population Genetics Practical 4: Heterozygosity, gene diversity and sequence variation"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Distinguish observed heterozygosity from frequency-based gene diversity; explain a finite-sample correction and its assumptions; count segregating sites and haplotypes; calculate nucleotide diversity; and report the sample and reference behind a diversity summary.
+
+Continue from [Practical 3](structure_mating_inbreeding.qmd) and read alongside [measuring genetic variation](../slides/introduction_population_genetics.qmd#measuring-genetic-variation). All examples use base R and hypothetical data. The short sequences below are explicitly supplied chromosome sequences, not phase inferred from genotype dosages.
+
+## 1. Observed heterozygosity and gene diversity
+
+At a diploid biallelic locus, observed heterozygosity $H_O$ is the fraction of called individuals that are heterozygous. Gene diversity is
+
+$$H_E=1-\sum_k p_k^2=2p(1-p)$$
+
+for two alleles. It is the probability that two independent allele draws from the specified frequency pool differ. It is an expected genotype heterozygosity only under the appropriate random-union model. Calculating this frequency summary does not establish HWE.
+
+```{r}
+#| label: diversity-at-one-locus
+dosage <- c(2L,1L,NA_integer_,0L,1L,2L) # Counts A.
+called <- dosage[!is.na(dosage)]
+stopifnot(all(called %in% 0:2),length(called)>0L)
+n_individuals <- length(called)
+n_alleles <- 2*n_individuals
+p <- sum(called)/n_alleles
+HO <- mean(called==1L)
+HE <- 2*p*(1-p)
+c(called_individuals=n_individuals,called_alleles=n_alleles,
+  p_A=p,observed_heterozygosity=HO,gene_diversity=HE)
+stopifnot(abs(HO-.4)<1e-12,abs(HE-.48)<1e-12)
+```
+
+**Question 1.** Why are 0.4 and 0.48 different, and which is a direct description of heterozygous individuals?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+$H_O=0.4$ directly describes called genotypes. $H_E=0.48$ describes independent pairing at the estimated allele frequencies. Their difference can reflect finite sampling, mating, structure or other processes; it does not by itself identify a biological cause.
+:::
+
+## 2. A finite-sample correction
+
+Suppose $m$ allele copies are sampled independently from a fixed population frequency distribution. The plug-in diversity $1-\sum_k\hat p_k^2$ is downward biased because a finite sample estimates its own frequencies. The corrected estimator is
+
+$$\widehat H_{unbiased}=\frac{m}{m-1}\left(1-\sum_k\hat p_k^2\right),\qquad m>1.$$
+
+It is also the fraction of **distinct sampled-copy pairs** carrying different alleles. Its population-unbiased interpretation requires independent, identically distributed allele-copy sampling; counting two copies per diploid individual does not automatically establish independence. Relatives, inbreeding, population mixtures and informative missingness require an appropriate sampling treatment.
+
+```{r}
+#| label: corrected-diversity
+corrected_HE <- n_alleles/(n_alleles-1)*HE
+# Reconstruct the allele-copy labels only for this one-locus count example.
+allele_copies <- c(rep("A",sum(called)),rep("B",n_alleles-sum(called)))
+copy_pairs <- combn(seq_along(allele_copies),2)
+pair_difference <- mean(allele_copies[copy_pairs[1,]] !=
+                        allele_copies[copy_pairs[2,]])
+c(plugin=HE,corrected=corrected_HE,distinct_copy_pair_fraction=pair_difference)
+stopifnot(abs(corrected_HE-pair_difference)<1e-12)
+```
+
+The corrected result is about `r round(corrected_HE,3)`. It can exceed the population-model maximum of 0.5 in a small biallelic sample; do not silently truncate it. A correction for bias is not a confidence interval, nor a correction for related sampling.
+
+### Verify the bias by exact enumeration
+
+Take four independent allele draws from a known population with $p_A=0.6$. Enumerate all 16 ordered outcomes rather than simulate a large experiment.
+
+```{r}
+#| label: enumerate-sampling
+outcomes <- as.matrix(expand.grid(rep(list(0:1),4)))
+m <- ncol(outcomes)
+p_true <- .6
+A_count <- rowSums(outcomes)
+probability <- p_true^A_count*(1-p_true)^(m-A_count)
+p_sample <- A_count/m
+plugin_values <- 2*p_sample*(1-p_sample)
+corrected_values <- m/(m-1)*plugin_values
+expectations <- c(population_diversity=2*p_true*(1-p_true),
+  expected_plugin=sum(probability*plugin_values),
+  expected_corrected=sum(probability*corrected_values))
+expectations
+stopifnot(abs(sum(probability)-1)<1e-12,
+          abs(expectations["expected_plugin"]-.36)<1e-12,
+          abs(expectations["expected_corrected"]-.48)<1e-12)
+```
+
+**Question 2.** Does the correction make every observed sample equal to the true diversity?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. It corrects the average over repeated samples under the declared model, not the error in each sample. A monomorphic four-copy sample still has estimated diversity zero even though the population is polymorphic.
+:::
+
+## 3. Summarize several loci with explicit denominators
+
+Use individual rows and marker columns. All columns in this hypothetical matrix count the explicitly chosen allele at their own locus. The third locus is invariant in the sample; it belongs in the denominator if the target is diversity across this three-locus panel.
+
+```{r}
+#| label: multilocus-diversity
+M <- cbind(L1=dosage,L2=c(0L,1L,2L,2L,NA_integer_,1L),L3=rep(2L,6))
+rownames(M) <- paste0("individual",1:6)
+locus_summary <- t(vapply(seq_len(ncol(M)),function(j) {
+  x <- M[,j]
+  x <- x[!is.na(x)]
+  if(length(x)==0L) return(c(n_called=0,p=NA,HO=NA,HE=NA))
+  stopifnot(all(x %in% 0:2))
+  pj <- sum(x)/(2*length(x))
+  c(n_called=length(x),p=pj,HO=mean(x==1L),HE=2*pj*(1-pj))
+},numeric(4)))
+rownames(locus_summary) <- colnames(M)
+knitr::kable(locus_summary,digits=3)
+c(equal_locus_mean_HE=mean(locus_summary[,"HE"]),
+  polymorphic_locus_mean_HE=mean(locus_summary[locus_summary[,"HE"]>0,"HE"]))
+```
+
+```{r}
+#| label: fig-locus-diversity
+#| fig-cap: "Observed heterozygosity and plug-in gene diversity at three hypothetical loci, including an invariant locus."
+barplot(t(locus_summary[,c("HO","HE")]),beside=TRUE,
+        col=c("#247BA0","#D8A47F"),ylim=c(0,.6),ylab="Diversity",
+        legend.text=c("Observed heterozygosity","Gene diversity"),
+        args.legend=list(x="topright",bty="n"))
+```
+
+**Question 3.** Why does averaging only polymorphic loci give a higher value?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+It removes zero-diversity loci and changes the target. Diversity conditional on a marker being polymorphic is not the same as diversity across a specified panel or all callable sequence sites. Marker discovery/ascertainment and locus weighting must be declared when comparing datasets. An all-missing locus is undefined, not invariant.
+:::
+
+## 4. Measure diversity in aligned chromosome sequences
+
+Consider four supplied haploid chromosome sequences, each six nucleotides long. They contain three distinct sequence types. Here phase is known because chromosome sequences are given directly; genotype dosage data alone would not establish them.
+
+```{r}
+#| label: chromosome-sequences
+sequences <- c(chr1="AACGTA",chr2="AACGTA",chr3="AATGTA",chr4="AGTGTT")
+alignment <- do.call(rbind,strsplit(sequences,""))
+rownames(alignment) <- names(sequences)
+stopifnot(all(alignment %in% c("A","C","G","T")))
+colnames(alignment) <- paste0("site",seq_len(ncol(alignment)))
+alignment
+segregating <- apply(alignment,2,function(x) length(unique(x))>1L)
+S <- sum(segregating)
+haplotype_counts <- table(sequences)
+H <- length(haplotype_counts)
+c(chromosomes=nrow(alignment),sites=ncol(alignment),
+  segregating_sites=S,distinct_haplotypes=H)
+stopifnot(S==3,H==3)
+```
+
+These sequences have no gaps or missing bases. A real alignment requires a declared callable-site policy, including how pairwise missingness, indels and multiallelic sites are handled. The number of haplotypes is a count, not heterozygosity; it also depends on how many chromosomes and how much sequence were sampled.
+
+### Calculate nucleotide diversity
+
+Nucleotide diversity $\pi$ is the mean pairwise nucleotide difference **per site** across distinct sampled chromosomes. Retain invariant sites in the sequence-length denominator.
+
+```{r}
+#| label: nucleotide-diversity
+pairs <- combn(seq_len(nrow(alignment)),2)
+differences <- apply(pairs,2,function(pair) {
+  sum(alignment[pair[1],] != alignment[pair[2],])
+})
+pair_results <- data.frame(chromosome1=rownames(alignment)[pairs[1,]],
+                           chromosome2=rownames(alignment)[pairs[2,]],
+                           nucleotide_differences=differences)
+knitr::kable(pair_results,row.names=FALSE)
+pi <- mean(differences)/ncol(alignment)
+pi
+stopifnot(sum(differences)==10,abs(pi-5/18)<1e-12)
+# Independent per-site calculation on distinct sampled copies.
+site_diversity <- apply(alignment,2,function(x) {
+  f <- as.numeric(table(x))/length(x)
+  length(x)/(length(x)-1)*(1-sum(f^2))
+})
+stopifnot(abs(mean(site_diversity)-pi)<1e-12)
+```
+
+**Question 4.** Why are nucleotide diversity and whole-haplotype diversity different?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Whole-haplotype diversity asks whether two sequences differ at all. Nucleotide diversity measures how many sites differ, divided by callable sequence length. Two different haplotypes might differ at one site or many sites; haplotype labels alone discard that distance information.
+:::
+
+## 5. State the reference population
+
+A diversity result needs the counted alleles or sequence representation, sampled individuals/chromosomes, population labels, missing-call denominators, locus/site set, weights and correction assumptions. Pooling populations can increase frequency-based diversity while hiding lower within-population diversity, as Practical 3 showed.
+
+For the diploid example, $H_O$ describes observed individuals, and $H_E$ uses their estimated frequency pool. For the sequence example, the pairwise calculation describes these four supplied chromosomes over six complete sites. Neither toy example establishes a population history, effective population size or genome-wide diversity estimate.
+
+## Exercises
+
+1. Calculate whole-haplotype plug-in and corrected diversity for the sequence example. Compare with $\pi$.
+2. Recalculate nucleotide diversity using only the three variable sites. Explain the changed denominator.
+3. Add two invariant sites to every sequence. What changes in $S$, haplotype count and $\pi$?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+f_hap <- as.numeric(haplotype_counts)/sum(haplotype_counts)
+H_hap_plugin <- 1-sum(f_hap^2)
+H_hap_corrected <- length(sequences)/(length(sequences)-1)*H_hap_plugin
+c(haplotype_plugin=H_hap_plugin,haplotype_corrected=H_hap_corrected,
+  nucleotide_diversity=pi)
+variable_site_pi <- mean(differences)/S
+extended_pi <- mean(differences)/(ncol(alignment)+2)
+c(variable_sites_only=variable_site_pi,extended_sequence=extended_pi)
+stopifnot(abs(H_hap_plugin-.625)<1e-12,
+          abs(H_hap_corrected-5/6)<1e-12,
+          abs(variable_site_pi-5/9)<1e-12,
+          abs(extended_pi-5/24)<1e-12)
+```
+Whole-haplotype corrected diversity is $5/6$, while nucleotide diversity is $5/18$ per site. Restricting to variable sites yields $5/9$, a conditional summary with a different target. Adding two shared invariant sites leaves segregating-site and haplotype counts unchanged but lowers diversity per site to $5/24$.
+:::
+
+## Package connection and next topic
+
+These are transparent teaching calculations. `gpop` owns population diversity summaries and estimators; its [scientific interfaces remain proposed](https://github.com/psoerensen/gpop/blob/main/docs/design/scope.md). A future API must declare its sampling correction, reference, sequence/call representation and missingness policy. No new package function is introduced here.
+
+Next study the forces changing variation: mutation, migration, recombination, drift and selection, distinguishing deterministic expectations from stochastic biological realizations.
