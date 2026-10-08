@@ -16,6 +16,11 @@
 
 - [Mutation, selection and drift at balance](mutation_balance.qmd): Practical 9, deterministic recursions and an exact small neutral transition model.
 
+- [Conservation genetics and management choices](conservation_genetics.qmd): Practical 10, contributions, kinship, marker diversity and budgets.
+- [DNA profiles and match probabilities](dna_match_probabilities.qmd): Practical 11, multi-allelic genotypes, population structure and evidence interpretation.
+- [Sequence divergence and the molecular clock](molecular_clock.qmd): Practical 12, substitution distance, rate units and calibration.
+- [Disease alleles, penetrance and population risk](disease_alleles_penetrance.qmd): Practical 13, genotype-specific phenotype probabilities and conditioning.
+
 All use base R and hypothetical data, with no required downloads or package installations. gpop links refer to its existing teaching examples, not proposed scientific APIs.
 
 Render an individual page from the repository root:

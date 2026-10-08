@@ -5104,122 +5104,30 @@ That is the framework of the field.
 
 
 
-<!-- This is for speaker notes toogle - need more work 
-
 ## The Molecular Clock (Simple Version)
 
-::: {.columns}
+### Distance, rate and time
 
-::: {.column width="50%"}
+Let $d$ be substitution distance per site along both lineages, and $r$ the constant substitution rate per site **per lineage per generation**.
 
-### Theory
+For two equally evolving lineages:
 
-Neutral mutations accumulate over time.
+$$d=2rt,\qquad t=\frac{d}{2r}.$$
 
-If the mutation rate is constant,
-DNA differences increase approximately linearly.
+- Both lineages contribute to the distance.
+- Observed differences can miss repeated substitutions.
+- A calibrated rate and compatible units are required.
+- Sequence common ancestry need not date a species split.
 
-For two diverging species:
-
-$$
-d = 2 \mu t
-$$
-
-Rearranged:
-
-$$
-t = \frac{d}{2\mu}
-$$
-
-Where:
-
-- $d$ = sequence divergence  
-- $\mu$ = mutation rate per lineage per generation  
-- $t$ = time since divergence (in generations)
-
-:::
-
-::: {.column width="50%"}
-
-### Interpretation and Example
-
-Both lineages accumulate mutations after divergence.
-
-The factor 2 reflects:
-
-- Mutation in lineage 1  
-- Mutation in lineage 2  
-
-<br>
-
-Example:
-
-Humans and chimpanzees differ by ~1.8%  
-at neutral sites.
-
-Using typical mutation rate estimates:
-
-Estimated divergence ≈ 5–7 million years ago.
-
-Assumptions:
-
-- Mutations are neutral  
-- Mutation rate is approximately constant  
-
-:::
-
-:::
-
+Work through [Practical 12: Sequence divergence and the molecular clock](../tutorials/molecular_clock.html).
 
 ::: notes
 
-The molecular clock is based on a simple but powerful idea:
-
-Neutral mutations accumulate at an approximately constant rate.
-
-If two species split from a common ancestor,
-each lineage accumulates mutations independently.
-
-That is why the equation includes a factor of two.
-
-Total sequence divergence equals
-two times the mutation rate
-times the time since divergence.
-
-The mutation rate here is per lineage,
-per generation.
-
-The time calculated from the equation
-is measured in generations.
-To convert to years,
-we multiply by generation time.
-
-If we can measure sequence divergence
-and estimate the mutation rate,
-we can estimate divergence time.
-
-For example,
-humans and chimpanzees differ
-by roughly 1.8 percent at neutral sites.
-
-Using commonly estimated mutation rates
-and human generation times,
-this gives a divergence time
-on the order of five to seven million years.
-
-The molecular clock relies on key assumptions.
-
-First,
-the mutations considered must be approximately neutral.
-
-Second,
-the mutation rate must be roughly constant over time.
-
-When those assumptions are reasonable,
-DNA sequence divergence can be used
-as a biological clock.
+The distance is expressed in substitutions per site, rather than the uncorrected fraction of different bases. The rate here is per lineage per generation; a pairwise rate would use a different factor convention. Equating substitution and mutation rates requires an appropriate neutral model. Constant-rate dating depends on its calibration and evolutionary assumptions. Ancestral polymorphism can make sequence common ancestry older than population separation. Practical 12 illustrates these distinctions with hypothetical sequences and parameters.
 
 :::
+
+<!-- This is for speaker notes toogle - need more work
 
 ## The Domestication Bottleneck
 

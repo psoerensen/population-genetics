@@ -1376,7 +1376,7 @@
     "href": "tutorials/testing_hwe.html#app-and-package-connections",
     "title": "Testing Hardy–Weinberg proportions",
     "section": "App and package connections",
-    "text": "App and package connections\nThe existing HWE test Shiny source is available for optional local exploration with its existing dependencies; this practical does not modify or qualify it. gpop owns population summaries and estimator assumptions. The base-R enumeration here is a teaching calculation, not an exported gpop method.\nReturn to population structure and inbreeding for interpretation or the course map for teaching routes. The next extension is a worked association analysis with covariates, multiple testing and cautious causal interpretation."
+    "text": "App and package connections\nThe existing HWE test Shiny source is available for optional local exploration with its existing dependencies; this practical does not modify or qualify it. gpop owns population summaries and estimator assumptions. The base-R enumeration here is a teaching calculation, not an exported gpop method.\nReturn to population structure and inbreeding for interpretation or the course map for teaching routes. For a worked association analysis with covariates, multiple testing and cautious causal interpretation, continue to QG Practical 13."
   },
   {
     "objectID": "tutorials/mutation_balance.html",
