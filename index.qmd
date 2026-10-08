@@ -52,6 +52,8 @@ After completing the course, students should be able to:
 
 - [Practical 12: Sequence divergence and the molecular clock](tutorials/molecular_clock.qmd) — comparable sites, substitution distances, rate units and calibration uncertainty.
 
+- [Practical 13: Disease alleles, penetrance and population risk](tutorials/disease_alleles_penetrance.qmd) — genotype frequencies, phenotype probabilities, inbreeding and conditional risk.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

@@ -46,6 +46,10 @@ slides/introduction_population_genetics_narrated.qmd
 
 [Tutorial 12](tutorials/molecular_clock.qmd) explores sequence differences, Jukes–Cantor distance and clock calibration using hypothetical inputs and base R.
 
+## Disease-allele practical
+
+[Tutorial 13](tutorials/disease_alleles_penetrance.qmd) explores allele frequencies, penetrance and population versus known-parent probabilities with hypothetical inputs and base R.
+
 ## Included Apps
 
 The repository includes these R/Shiny app source files:

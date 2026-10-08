@@ -15,6 +15,7 @@ project:
     - tutorials/conservation_genetics.qmd
     - tutorials/dna_match_probabilities.qmd
     - tutorials/molecular_clock.qmd
+    - tutorials/disease_alleles_penetrance.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -57,6 +58,8 @@ website:
             href: tutorials/dna_match_probabilities.html
           - text: "12. Sequence divergence and molecular clock"
             href: tutorials/molecular_clock.html
+          - text: "13. Disease alleles and penetrance"
+            href: tutorials/disease_alleles_penetrance.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 
