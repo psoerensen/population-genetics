@@ -21,6 +21,9 @@
 - [Sequence divergence and the molecular clock](molecular_clock.qmd): Practical 12, substitution distance, rate units and calibration.
 - [Disease alleles, penetrance and population risk](disease_alleles_penetrance.qmd): Practical 13, genotype-specific phenotype probabilities and conditioning.
 
+- [Selective sweeps and genetic hitchhiking](selective_sweeps.qmd): Practical 14, two-locus dynamics, recombination and interpretation.
+- [Coalescent history and sampled variation](coalescent_history.qmd): Practical 15, genealogy simulation, branch mutations and demographic expectations.
+
 All use base R and hypothetical data, with no required downloads or package installations. gpop links refer to its existing teaching examples, not proposed scientific APIs.
 
 Render an individual page from the repository root:

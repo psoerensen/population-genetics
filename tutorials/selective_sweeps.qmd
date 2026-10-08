@@ -1,0 +1,170 @@
+---
+title: "Selective sweeps and genetic hitchhiking"
+subtitle: "Population Genetics Practical 14: Selection, linkage and diversity"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Specify a two-locus selection and recombination model; trace a neutral allele carried by a beneficial background; compare recombination rates and initial backgrounds; and distinguish a mechanism from evidence for a sweep in genomic data.
+
+Review [haplotypes and LD](mutation_migration_ld.qmd), [diversity](genetic_diversity.qmd) and [selection](selection_fitness.qmd). Read alongside the slides on [selective sweeps](../slides/introduction_population_genetics.qmd#selective-sweep-and-genetic-variation). All inputs are hypothetical and use base R.
+
+## 1. Define the life cycle and initial haplotypes
+
+Use an infinite deterministic population with haplotypes AB, Ab, aB and ab. A has reproductive weight $1+s$, while a has weight 1; B/b is neutral. First weight haplotypes by reproduction, then form random pairs and recombine at fraction r. The tracked population is a haplotype pool, not a diploid dominance model. There is no drift, mutation or migration.
+
+Initially A has frequency 0.01 and occurs only on the B background. B has frequency 0.5. This represents selection starting from one marker background; we do not simulate the origin or establishment of a new beneficial mutation.
+
+```{r}
+#| label: sweep-inputs
+h0 <- c(AB=.01,Ab=0,aB=.49,ab=.5)
+s <- .2
+summary_h <- function(h) {
+  stopifnot(identical(names(h),c("AB","Ab","aB","ab")),
+            all(is.finite(h)),all(h>=-1e-12),abs(sum(h)-1)<1e-12)
+  pA <- unname(h["AB"]+h["Ab"])
+  pB <- unname(h["AB"]+h["aB"])
+  c(pA=pA,pB=pB,D=unname(h["AB"])-pA*pB,HE_B=2*pB*(1-pB))
+}
+summary_h(h0)
+```
+
+## 2. Selection moves the linked neutral allele
+
+Let $D=f_{AB}-p_Ap_B$. Weighting the A background gives
+
+$$p_A^{(s)}=\frac{(1+s)p_A}{1+sp_A},\qquad
+p_B^{(s)}-p_B=\frac{sD}{1+sp_A}.$$
+
+The neutral allele changes because it is associated with the selected background. This is genetic hitchhiking, introduced by [Maynard Smith and Haigh (1974)](https://doi.org/10.1017/S0016672300014634).
+
+After selection, calculate $D_s$ in the weighted pool. Recombination changes haplotypes by $rD_s(-1,+1,+1,-1)$, conserving both allele margins while reducing LD to $(1-r)D_s$.
+
+```{r}
+#| label: sweep-step
+sweep_step <- function(h,s,r) {
+  summary_h(h)
+  stopifnot(length(s)==1,is.finite(s),s>=0,
+            length(r)==1,is.finite(r),r>=0,r<=.5)
+  selected <- h*c(1+s,1+s,1,1)
+  selected <- selected/sum(selected)
+  Ds <- unname(summary_h(selected)["D"])
+  next_h <- selected+r*Ds*c(-1,1,1,-1)
+  summary_h(next_h)
+  list(selected=selected,next_h=next_h)
+}
+step <- sweep_step(h0,s,.1)
+before <- summary_h(h0)
+after_selection <- summary_h(step$selected)
+after <- summary_h(step$next_h)
+stopifnot(abs(after_selection["pB"]-before["pB"]-
+  s*before["D"]/(1+s*before["pA"]))<1e-12,
+  max(abs(after[c("pA","pB")]-after_selection[c("pA","pB")]))<1e-12,
+  abs(after["D"]-.9*after_selection["D"])<1e-12)
+rbind(initial=before,selected=after_selection,recombined=after)
+```
+
+## 3. Compare recombination rates
+
+```{r}
+#| label: sweep-trajectories
+trajectory <- function(h,s,r,generations=100) {
+  out <- matrix(NA_real_,generations+1,4,
+                dimnames=list(NULL,names(summary_h(h))))
+  out[1,] <- summary_h(h)
+  for(t in seq_len(generations)) {
+    h <- sweep_step(h,s,r)$next_h
+    out[t+1,] <- summary_h(h)
+  }
+  out
+}
+rates <- c(0,.01,.1,.5)
+paths <- lapply(rates,function(r) trajectory(h0,s,r))
+# The selected-locus odds increase by factor 1+s each generation.
+times <- 0:100
+odds <- .01/.99*(1+s)^times
+expected_A <- odds/(1+odds)
+stopifnot(all(vapply(paths,function(x) max(abs(x[,"pA"]-expected_A))<1e-12,
+                     logical(1))))
+no_recomb_B <- expected_A+(1-expected_A)*(.49/.99)
+stopifnot(max(abs(paths[[1]][,"pB"]-no_recomb_B))<1e-12)
+```
+
+```{r}
+#| label: sweep-plots
+#| fig-width: 9
+#| fig-height: 5
+local({
+  old <- par(mfrow=c(1,2));on.exit(par(old))
+  colors <- c("#d95f02","#7570b3","#1b9e77","#247BA0")
+  matplot(times,sapply(paths,function(x) x[,"pB"]),type="l",lty=1,
+          lwd=2,col=colors,ylim=c(0,1),xlab="Generation",ylab="Neutral B frequency")
+  legend("bottomright",paste("r =",rates),col=colors,lty=1,bty="n")
+  matplot(times,sapply(paths,function(x) x[,"HE_B"]),type="l",lty=1,
+          lwd=2,col=colors,ylim=c(0,.5),xlab="Generation",ylab="Neutral-locus gene diversity")
+})
+```
+
+The A trajectories coincide because recombination does not alter its marginal reproductive advantage here. The linked neutral locus has different trajectories. With no recombination, B approaches fixation as A becomes common; recombination allows A onto alternative marker backgrounds and preserves more marker diversity in these examples.
+
+The deterministic allele approaches fixation without reaching it at a finite model step. The example does not include stochastic establishment or time to actual fixation. Recombination fraction is not physical distance; these curves are not a genomic scan or a measured width of a sweep.
+
+## 4. Initial backgrounds matter
+
+Start A at the same frequency but distribute it equally across B and b. Both loci initially have zero LD. There is no marker hitchhiking in this deterministic model even though A increases.
+
+```{r}
+#| label: alternative-backgrounds
+multiple_backgrounds <- c(AB=.005,Ab=.005,aB=.495,ab=.495)
+multiple <- trajectory(multiple_backgrounds,s,0)
+stopifnot(max(abs(multiple[,"pA"]-expected_A))<1e-12,
+          max(abs(multiple[,"pB"]-.5))<1e-12,
+          max(abs(multiple[,"D"]))<1e-12)
+data.frame(initial_background=c("A only with B","A with both B and b"),
+           terminal_A=c(paths[[1]][101,"pA"],multiple[101,"pA"]),
+           terminal_B=c(paths[[1]][101,"pB"],multiple[101,"pB"]),
+           terminal_HE=c(paths[[1]][101,"HE_B"],multiple[101,"HE_B"]))
+```
+
+This comparison illustrates why selection need not erase variation on every marker background. Hard and soft sweep models distinguish beneficial origins and genealogical backgrounds. Our four-state model does not reconstruct those origins, so initial marker diversity alone does not classify a real sweep as hard or soft.
+
+## 5. Interpret genomic signatures with alternatives
+
+A recent sweep can motivate looking for reduced local diversity, unusually common haplotypes and LD patterns. A completed sweep need not retain high LD: fixed sites have no polymorphic LD correlation, and recombination continues to alter surrounding variation.
+
+Low diversity alone cannot identify selection. Demography, mutation-rate variation, sampling, ascertainment and selection against linked deleterious alleles can also affect summaries. Establishing a genomic signal requires a suitable null model, genomic and recombination information, and a declared testing procedure. This practical demonstrates hitchhiking rather than qualifying a detection method.
+
+## Exercises
+
+1. Set s=0. Which allele margins remain unchanged even when recombination occurs?
+2. Start A only on b, keeping its frequency 0.01 and B frequency 0.5. Predict the direction of B change.
+3. Explain why the selected locus follows the same trajectory at all four recombination rates.
+4. Would reduced diversity at a locus establish a selective sweep?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+neutral <- trajectory(h0,0,.1)
+stopifnot(max(abs(neutral[,"pA"]-.01))<1e-12,
+          max(abs(neutral[,"pB"]-.5))<1e-12)
+on_b <- c(AB=0,Ab=.01,aB=.5,ab=.49)
+reverse_path <- trajectory(on_b,s,0)
+stopifnot(reverse_path[101,"pB"]<.5)
+summary_h(on_b)
+```
+Without selection, recombination preserves both margins while reducing LD. If A starts on b, D is negative and B declines through hitchhiking of its alternative. Recombination conserves the selected margin, and the fitness weight depends only on A. A low-diversity observation requires comparison with plausible alternative models.
+:::
+
+## Package connections and next practical
+
+These base R recursions illustrate population expectations relevant to `gpop`; no exported sweep API is assumed. Extending to finite chromosome inheritance requires an explicit supported simulation model in `gsim`. The existing [selective-sweep Shiny source](../apps/Selective_Sweep_Simulator.R) is an optional local tool with its own model; this practical does not change or validate it.
+
+Continue to [Practical 15: Coalescent history](coalescent_history.qmd) to view sampled variation through ancestry backwards in time.

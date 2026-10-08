@@ -1,0 +1,236 @@
+---
+title: "Coalescent history and sampled variation"
+subtitle: "Population Genetics Practical 15: Genealogies, mutations and demographic assumptions"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Distinguish chromosome genealogy from organism pedigree; derive two-lineage waiting times; simulate a small neutral coalescent tree; place mutations on branches; connect diversity to ancestral time; and examine how a supplied population history changes waiting-time expectations.
+
+Review [drift](genetic_drift.qmd), [sequence diversity](genetic_diversity.qmd) and [the molecular clock](molecular_clock.qmd). All parameters and samples are hypothetical. Base R supplies the complete example, with no downloads or extra packages.
+
+## 1. Trace gene copies backwards
+
+A genealogy traces ancestral copies at a locus. A diploid individual's two chromosomes can have different genealogies, and recombination can give different trees along a chromosome. This practical uses a nonrecombining neutral segment, not the whole-genome pedigree of organisms.
+
+Assume a randomly mating diploid Wright–Fisher population with constant effective size $N_e$. Each gene copy chooses one of $2N_e$ parental copies. Two distinct lineages choose the same parent with probability $1/(2N_e)$ each generation. Their exact discrete waiting time is geometric on 1, 2, ... and has mean $2N_e$.
+
+```{r}
+#| label: pair-waiting-time
+Ne <- 1000
+coalescence_probability <- 1/(2*Ne)
+exact_mean <- 1/coalescence_probability
+exact_variance <- (1-coalescence_probability)/coalescence_probability^2
+c(mean_generations=exact_mean,variance_generations_squared=exact_variance)
+```
+
+For large $N_e$ with a small sample, the continuous-time coalescent approximates pair waiting time by an exponential distribution of rate $1/(2N_e)$. It excludes simultaneous multiple mergers. This is an approximation to the discrete ancestry process, not its exact finite-population simulation; see [Kingman (1982)](https://doi.org/10.1016/0304-4149(82)90011-4).
+
+```{r}
+#| label: discrete-continuous-check
+times <- c(0,500,2000,4000)
+data.frame(generations=times,
+           discrete_survival=(1-coalescence_probability)^times,
+           continuous_survival=exp(-times/(2*Ne)))
+```
+
+$N_e$ is a supplied model parameter rather than a census count estimated from these examples. Time is measured backwards from sampling, in generations.
+
+## 2. Waiting times with several sampled chromosomes
+
+With k lineages, there are $\binom{k}{2}$ possible pairs. In the standard coalescent the total merger rate is
+
+$$\lambda_k=\frac{\binom{k}{2}}{2N_e},\qquad
+E(T_k)=\frac{2N_e}{\binom{k}{2}}.$$
+
+Each pair is equally likely to merge. The waiting intervals are independent under this constant-size model. For n sampled chromosomes,
+
+$$E(T_{\mathrm{MRCA}})=4N_e\left(1-\frac1n\right),\qquad
+E(B)=4N_e\sum_{i=1}^{n-1}\frac1i,$$
+
+where B is total branch length in chromosome-generations, excluding any branch above the sample's common ancestor.
+
+```{r}
+#| label: coalescent-expectations
+n <- 6L
+k <- n:2
+expected_wait <- 2*Ne/choose(k,2)
+expected_mrca <- sum(expected_wait)
+expected_length <- sum(k*expected_wait)
+stopifnot(abs(expected_mrca-4*Ne*(1-1/n))<1e-10,
+          abs(expected_length-4*Ne*sum(1/(1:(n-1))))<1e-10)
+data.frame(lineages=k,expected_wait_generations=expected_wait)
+c(expected_MRCA=expected_mrca,expected_total_branch_length=expected_length)
+```
+
+The mean time for one pair is $2N_e$, while the common ancestor of all six chromosomes has a different expectation. Increasing sample size adds many recent branches; it does not multiply the expected tree height by n.
+
+## 3. Simulate one genealogy
+
+Merge a uniformly selected pair after each exponential waiting time. Record descendant membership as well as node heights so the tree can support mutation and pairwise checks.
+
+```{r}
+#| label: simulate-genealogy
+set.seed(1501)
+height <- numeric(2*n-1)
+descendants <- matrix(FALSE,2*n-1,n)
+descendants[1:n,] <- diag(TRUE,n)
+active <- seq_len(n)
+edges <- matrix(integer(),0,2,dimnames=list(NULL,c("parent","child")))
+pair_time <- matrix(0,n,n)
+waits <- numeric(n-1)
+time <- 0
+for(event in seq_len(n-1)) {
+  k_now <- length(active)
+  waits[event] <- rexp(1,rate=choose(k_now,2)/(2*Ne))
+  time <- time+waits[event]
+  chosen <- sample(seq_along(active),2,replace=FALSE)
+  children <- active[chosen]
+  parent <- n+event
+  height[parent] <- time
+  descendants[parent,] <- descendants[children[1],] | descendants[children[2],]
+  a <- which(descendants[children[1],]);b <- which(descendants[children[2],])
+  pair_time[a,b] <- pair_time[b,a] <- time
+  edges <- rbind(edges,c(parent,children[1]),c(parent,children[2]))
+  active <- c(active[-chosen],parent)
+}
+branch_length <- height[edges[,"parent"]]-height[edges[,"child"]]
+stopifnot(length(active)==1,nrow(edges)==2*(n-1),all(branch_length>0),
+          abs(sum(branch_length)-sum((n:2)*waits))<1e-10,
+          abs(max(pair_time)-sum(waits))<1e-10)
+c(realized_MRCA=time,realized_total_branch_length=sum(branch_length),
+  realized_mean_pair_MRCA=mean(pair_time[upper.tri(pair_time)]))
+```
+
+```{r}
+#| label: genealogy-plot
+x <- numeric(2*n-1);x[1:n] <- seq_len(n)
+for(parent in (n+1):(2*n-1)) {
+  children <- edges[edges[,"parent"]==parent,"child"]
+  x[parent] <- mean(x[children])
+}
+plot(NA,xlim=c(.5,n+.5),ylim=c(0,max(height)*1.08),
+     xlab="Sampled chromosome",ylab="Generations before sampling",xaxt="n")
+axis(1,at=1:n,labels=paste0("c",1:n))
+for(i in seq_len(nrow(edges))) {
+  parent <- edges[i,"parent"];child <- edges[i,"child"]
+  segments(x[child],height[child],x[child],height[parent],col="#1b9e77")
+  segments(x[child],height[parent],x[parent],height[parent],col="#1b9e77")
+}
+points(x,height,pch=19,cex=.6)
+```
+
+The topology need not be ordered by chromosome label, so drawn lines can cross. Crossings are a plotting consequence, not recombination. One realized tree differs from the population expectation; it is not an inferred history from observed sequences.
+
+## 4. Place neutral mutations on branches
+
+Use an infinite-sites model: each mutation creates a distinct variable site and no site changes twice. Let $\mu$ be the mutation rate per site per generation and L the segment-length scale. A branch of length b receives a Poisson number of mutations with mean $\mu Lb$. All descendants inherit its mutations.
+
+```{r}
+#| label: mutations-on-tree
+mu <- 1e-6
+L <- 1000L
+mutations <- rpois(length(branch_length),lambda=mu*L*branch_length)
+mutation_edge <- rep(seq_along(mutations),mutations)
+S <- length(mutation_edge)
+stopifnot(S>0,S<=L) # This seeded teaching draw fits the displayed segment scale.
+M <- t(descendants[edges[mutation_edge,"child"],,drop=FALSE])*1L
+rownames(M) <- paste0("c",1:n)
+colnames(M) <- paste0("mutation",seq_len(S))
+M
+pairs <- combn(n,2)
+differences <- apply(pairs,2,function(p) sum(M[p[1],]!=M[p[2],]))
+pi_sample <- mean(differences)/L
+harmonic <- sum(1/(1:(n-1)))
+theta_W <- S/(L*harmonic)
+stopifnot(all(colSums(M)>0),all(colSums(M)<n),
+          abs(pi_sample-mean(apply(M,2,function(z) {
+            p <- mean(z);n/(n-1)*2*p*(1-p)
+          }))*S/L)<1e-12)
+c(segregating_sites=S,nucleotide_diversity=pi_sample,Watterson_theta=theta_W)
+```
+
+Columns represent distinct mutation events, rather than repeated changes among A, C, G and T. The infinite-sites model is a low-recurrent-mutation approximation, not an exact finite-alphabet model of L sites. The seeded example uses fewer variable columns than L; invariant sites remain in the diversity denominator.
+
+Conditional on this tree,
+
+$$E(S\mid \text{tree})=\mu LB,\qquad
+E(\pi\mid \text{tree})=2\mu \overline{T}_{\mathrm{pair}}.$$
+
+Across genealogies under the constant-size neutral model, $E(\pi)=4N_e\mu$ and $E(S)=4N_e\mu L\sum_{i=1}^{n-1}1/i$. Therefore nucleotide diversity and $S/(L\sum 1/i)$ estimate the same scaled mutation parameter under this model, though they differ in a finite realization.
+
+```{r}
+#| label: conditional-mutation-expectations
+mean_pair_time <- mean(pair_time[upper.tri(pair_time)])
+# Count pairs separated by each branch and average their mutation exposure.
+number_descendants <- rowSums(descendants[edges[,"child"],,drop=FALSE])
+branch_pair_average <- sum(branch_length*number_descendants*(n-number_descendants))/choose(n,2)
+stopifnot(abs(branch_pair_average-2*mean_pair_time)<1e-10)
+c(expected_S_given_tree=mu*L*sum(branch_length),
+  expected_pi_given_tree=2*mu*mean_pair_time,
+  population_theta=4*Ne*mu)
+```
+
+These are mutation expectations and sample summaries. Neither a tree nor a diversity estimate alone identifies both $N_e$ and $\mu$. A departure between the two summaries can have several explanations; it is not automatically evidence for selection or a bottleneck.
+
+## 5. A supplied demographic history changes pair survival
+
+For illustration, let recent effective size be 200 for the last 500 generations, with older size 1000. Pairwise coalescence rate is $1/(2N_e(t))$. The survival probability is
+
+$$P(T>t)=\exp\left[-\frac{\min(t,b)}{2N_R}-\frac{\max(t-b,0)}{2N_A}\right],$$
+
+where b is the change time. This is a specified two-epoch continuous-time model, not an estimate from the six sampled chromosomes.
+
+```{r}
+#| label: demographic-survival
+recent <- 200;ancestral <- 1000;boundary <- 500
+t_grid <- seq(0,6000,length.out=200)
+survival <- exp(-pmin(t_grid,boundary)/(2*recent)-
+                pmax(t_grid-boundary,0)/(2*ancestral))
+plot(t_grid,survival,type="l",lwd=2,col="#d95f02",ylim=c(0,1),
+     xlab="Generations before sampling",ylab="Probability pair has not coalesced")
+lines(t_grid,exp(-t_grid/(2*ancestral)),lty=2,lwd=2,col="#247BA0")
+legend("topright",c("Recent smaller size","Constant Ne = 1000"),
+       col=c("#d95f02","#247BA0"),lty=c(1,2),bty="n")
+p_survive_recent <- exp(-boundary/(2*recent))
+mean_two_epoch <- 2*recent*(1-p_survive_recent)+2*ancestral*p_survive_recent
+c(constant_mean=2*ancestral,two_epoch_mean=mean_two_epoch)
+# Equal sizes must recover the constant-size expectation.
+p_constant <- exp(-boundary/(2*ancestral))
+stopifnot(abs(2*ancestral*(1-p_constant)+2*ancestral*p_constant-2*ancestral)<1e-10)
+```
+
+The smaller recent population increases recent coalescence probability. Different population histories can produce overlapping genealogical outcomes. Inferring history requires data, an observation model and an inference method. Sampling different species also needs population separation and ancestral structure; a gene-copy common ancestor need not date a species split.
+
+## Exercises
+
+1. Compute expected MRCA time and total branch length for n=2 and n=10 at the same effective size.
+2. Double the mutation rate on a fixed tree. What happens to expected S and nucleotide diversity?
+3. Explain why a branch above the sample MRCA does not contribute to segregating sites.
+4. Can the observed diversity uniquely distinguish a sweep from a recent population-size change?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+for(sample_size in c(2,10)) {
+  print(c(chromosomes=sample_size,
+          expected_MRCA=4*Ne*(1-1/sample_size),
+          expected_branch_length=4*Ne*sum(1/(1:(sample_size-1)))))
+}
+```
+Both mutation expectations double, while the genealogy is unchanged. Mutations above the sample MRCA are inherited by all sampled chromosomes and are not polymorphic within the sample. Selection and demography can affect local genealogies and diversity; the observation alone does not establish their cause. Recombination, genomic comparisons and an appropriate null/inference model supply additional information.
+:::
+
+## Package connections and teaching route
+
+This base R genealogy is an explicit teaching implementation, not a new exported `gpop` or `gsim` coalescent API. Population-history inference and organism-level breeding inheritance are distinct tasks. Biological forward simulation requires the corresponding supported model rather than substituting this genealogy for a complete pedigree.
+
+Read [Practical 14](selective_sweeps.qmd) for selection on linked variation, or return to [Practical 12](molecular_clock.qmd) to compare substitution-path dating with gene-copy ancestry.

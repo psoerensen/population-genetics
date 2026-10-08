@@ -14,7 +14,7 @@ This course introduces the principles used to describe genetic variation within 
 - **Statistical inference and equilibrium:** assess HWE proportions and distinguish deterministic balance from stationary variation in [Practicals 8–9](tutorials/testing_hwe.qmd).
 - **Applications:** connect the models to conservation choices, DNA-profile probabilities, molecular clocks and genotype-specific phenotype probabilities in [Practicals 10–13](tutorials/conservation_genetics.qmd).
 
-An HWE test can detect incompatibility with its sampling and null model; a departure alone cannot identify its cause. Selective-sweep signatures and worked coalescent history remain further teaching extensions rather than completed analyses in this sequence.
+An HWE test can detect incompatibility with its sampling and null model; a departure alone cannot identify its cause. [Practical 14](tutorials/selective_sweeps.qmd) explores hitchhiking and sweep interpretation; [Practical 15](tutorials/coalescent_history.qmd) builds a neutral genealogy and connects ancestry to sampled variation. These worked models do not qualify a genomic sweep-detection or demographic-inference workflow.
 
 ## Learning Objectives
 
@@ -62,6 +62,9 @@ After completing the course, students should be able to:
 - [Practical 12: Sequence divergence and the molecular clock](tutorials/molecular_clock.qmd) — comparable sites, substitution distances, rate units and calibration uncertainty.
 
 - [Practical 13: Disease alleles, penetrance and population risk](tutorials/disease_alleles_penetrance.qmd) — genotype frequencies, phenotype probabilities, inbreeding and conditional risk.
+
+- [Practical 14: Selective sweeps and genetic hitchhiking](tutorials/selective_sweeps.qmd) — linked neutral variation, recombination and initial backgrounds.
+- [Practical 15: Coalescent history and sampled variation](tutorials/coalescent_history.qmd) — backwards ancestry, mutation and demographic assumptions.
 
 ## Interactive Apps
 

@@ -16,6 +16,8 @@ project:
     - tutorials/dna_match_probabilities.qmd
     - tutorials/molecular_clock.qmd
     - tutorials/disease_alleles_penetrance.qmd
+    - tutorials/selective_sweeps.qmd
+    - tutorials/coalescent_history.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -60,6 +62,10 @@ website:
             href: tutorials/molecular_clock.html
           - text: "13. Disease alleles and penetrance"
             href: tutorials/disease_alleles_penetrance.html
+          - text: "14. Selective sweeps and hitchhiking"
+            href: tutorials/selective_sweeps.html
+          - text: "15. Coalescent history"
+            href: tutorials/coalescent_history.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

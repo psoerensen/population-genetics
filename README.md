@@ -50,6 +50,10 @@ slides/introduction_population_genetics_narrated.qmd
 
 [Tutorial 13](tutorials/disease_alleles_penetrance.qmd) explores allele frequencies, penetrance and population versus known-parent probabilities with hypothetical inputs and base R.
 
+## Linked selection and genealogical history
+
+[Practical 14](tutorials/selective_sweeps.qmd) explores selective sweeps and linked neutral variation. [Practical 15](tutorials/coalescent_history.qmd) simulates a neutral genealogy, places mutations on branches and examines demographic assumptions. Both use hypothetical inputs and base R.
+
 ## Included Apps
 
 The repository includes these R/Shiny app source files:
