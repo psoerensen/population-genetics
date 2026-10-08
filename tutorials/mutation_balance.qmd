@@ -1,0 +1,246 @@
+---
+title: "Mutation, selection and drift at balance"
+subtitle: "Population Genetics Practical 9: Equilibrium frequencies and stationary variation"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Combine mutation and selection in a declared life cycle; compare exact equilibria with rare-allele expressions; distinguish a deterministic equilibrium from a stationary distribution; calculate neutral mutation–drift diversity under a two-allele model; and identify when a different mutation model changes the formula.
+
+This synthesis connects [mutation](mutation_migration_ld.qmd), [drift](genetic_drift.qmd) and [selection](selection_fitness.qmd), alongside the slides on [mutation maintaining variation](../slides/introduction_population_genetics.qmd#mutation-maintains-genetic-variation). All examples use base R and hypothetical parameters; none estimates a mutation rate, fitness effect or effective population size in real data.
+
+## 1. Define the mutation–selection life cycle
+
+Let $q$ be the frequency of a deleterious allele a among zygotes, with $p=1-q$. Random union gives AA, Aa and aa proportions $p^2,2pq,q^2$. Their fitness weights are $1,1-hs,1-s$, where $s$ is the aa disadvantage and $h$ specifies its expression in heterozygotes.
+
+First apply selection. The a frequency in selected contributions is
+
+$$q_s=\frac{q^2(1-s)+pq(1-hs)}
+ {p^2+2pq(1-hs)+q^2(1-s)}.$$
+
+Then mutate A to a at rate $u$, without reverse mutation:
+
+$$q'=q_s+u(1-q_s).$$
+
+The next generation starts with random union at $q'$. This model is deterministic, with no drift or migration. Complete recessivity is $h=0$; $h=0.5$ gives an intermediate fitness disadvantage. These are fitness effects, not necessarily dominance for a measured trait.
+
+```{r}
+#| label: mutation-selection-step
+selection_frequency <- function(q,s,h) {
+  stopifnot(length(q)==1,is.finite(q),q>=0,q<=1,
+            length(s)==1,is.finite(s),s>=0,s<1,
+            length(h)==1,is.finite(h),h>=0,h<=1)
+  p <- 1-q
+  w <- p^2+2*p*q*(1-h*s)+q^2*(1-s)
+  (q^2*(1-s)+p*q*(1-h*s))/w
+}
+balance_step <- function(q,u,s,h) {
+  stopifnot(length(u)==1,is.finite(u),u>=0,u<1)
+  selected <- selection_frequency(q,s,h)
+  selected+u*(1-selected)
+}
+u <- 1e-4; s <- .1
+stopifnot(abs(balance_step(.3,0,0,.5)-.3)<1e-12,
+          abs(balance_step(0,u,s,.5)-u)<1e-12,
+          abs(balance_step(1,u,s,.5)-1)<1e-12)
+```
+
+The all-a boundary remains fixed because this one-way mutation model cannot recreate A. Our interior equilibrium comparison starts away from that boundary. Changing the order of mutation and selection changes the exact recursion, so the life cycle must accompany the formula.
+
+## 2. Find equilibria and compare familiar expressions
+
+An interior equilibrium satisfies $q'=q$. For a rare deleterious allele with $h>0$, the usual small-rate expression is $q\approx u/(hs)$. For complete recessivity it is $q\approx\sqrt{u/s}$; see the theoretical discussion of [selection versus transmission](https://pmc.ncbi.nlm.nih.gov/articles/PMC3258362/).
+
+For our specific one-way mutation-after-selection recursion with $h=0$, the equilibrium equation factors as $(1-q)(u-sq^2)=0$. Thus its interior root is exactly $\sqrt{u/s}$ when $u<s$. That exact equality is a property of this declared life cycle, not permission to treat the square-root expression as exact under every model.
+
+```{r}
+#| label: equilibrium-comparison
+h_values <- c(Recessive=0,Intermediate=.5)
+equilibrium <- vapply(h_values,function(h)
+  uniroot(function(q) balance_step(q,u,s,h)-q,c(0,.5),tol=1e-12)$root,
+  numeric(1))
+approximation <- c(Recessive=sqrt(u/s),Intermediate=u/(.5*s))
+stopifnot(abs(equilibrium["Recessive"]-sqrt(u/s))<1e-10,
+          max(abs(vapply(seq_along(h_values),function(i)
+            balance_step(equilibrium[i],u,s,h_values[i])-equilibrium[i],
+            numeric(1))))<1e-10)
+knitr::kable(data.frame(model=names(h_values),h=unname(h_values),
+  exact_equilibrium=unname(equilibrium),rare_allele_expression=unname(approximation)),
+  digits=6,row.names=FALSE)
+# At the interior root, mutation input balances selection removal.
+q <- equilibrium["Intermediate"]
+qs <- selection_frequency(q,s,.5)
+flux <- c(selection_change=qs-q,mutation_change=u*(1-qs))
+stopifnot(abs(sum(flux))<1e-10)
+flux
+```
+
+A recessive deleterious allele can persist at a higher equilibrium frequency because its copies are mostly carried in heterozygotes when rare. The comparison changes fitness dominance under the same mutation and homozygote disadvantage; it is not a statement about any particular disease allele.
+
+```{r}
+#| label: fig-selection-balance
+#| fig-cap: "Deterministic approaches to the interior equilibria under two fitness-dominance models. Lines begin at the same a frequency; equilibrium lines use roots of the declared recursion."
+#| fig-width: 8
+#| fig-height: 5
+trajectory <- function(q0,h,generations=2000L) {
+  q <- numeric(generations+1L); q[1] <- q0
+  for(t in seq_len(generations)) q[t+1L] <- balance_step(q[t],u,s,h)
+  q
+}
+paths <- vapply(h_values,function(h) trajectory(.2,h),numeric(2001))
+matplot(0:2000,paths,type="l",lty=1,lwd=2,
+        col=c("#247BA0","#D8A47F"),xlab="Generation",ylab="a frequency")
+abline(h=equilibrium,col=c("#247BA0","#D8A47F"),lty=2)
+legend("topright",names(h_values),col=c("#247BA0","#D8A47F"),
+       lty=1,lwd=2,bty="n")
+```
+
+## 3. Declare a neutral two-allele mutation–drift model
+
+Now use a different model: no selection, two alleles A/a, and symmetric reversible mutation at rate $\mu$ in each direction. A diploid Wright–Fisher population has $N$ individuals and $M=2N$ sampled copies. Conditional on current a frequency $q$, the pool frequency after mutation is
+
+$$q_m=\mu+(1-2\mu)q.$$
+
+The next copy count is $K'\sim\operatorname{Binomial}(M,q_m)$. At positive mutation, counts zero and $M$ can be left again. The number $N$ here defines the idealized sampling model; it is not an effective population-size estimate from a census or a real breeding programme.
+
+```{r}
+#| label: finite-transition-model
+N <- 5L; M <- 2*N; mu <- .05
+states <- 0:M
+grid <- states/M
+pool <- mu+(1-2*mu)*grid
+P <- t(vapply(pool,function(q) dbinom(states,size=M,prob=q),numeric(M+1L)))
+dimnames(P) <- list(current=states,next_count=states)
+stopifnot(max(abs(rowSums(P)-1))<1e-12,
+          max(abs(drop(P %*% grid)-pool))<1e-12,
+          P[1,2]>0,P[M+1,M]>0)
+```
+
+The small population and relatively large mutation rate keep the finite distribution visible. They are chosen for teaching, not realistic values for a nucleotide mutation process.
+
+## 4. Calculate the stationary distribution
+
+A stationary probability vector $\pi$ satisfies $\pi^TP=\pi^T$ and sums to one. It describes the distribution over count states after equilibration, not a constant allele count in each generation. Solve the finite system exactly up to numerical precision.
+
+```{r}
+#| label: stationary-distribution
+system <- t(P)-diag(M+1L)
+system[M+1L,] <- 1
+rhs <- c(rep(0,M),1)
+stationary <- drop(solve(system,rhs))
+stopifnot(all(stationary>0),abs(sum(stationary)-1)<1e-12,
+          max(abs(drop(stationary %*% P)-stationary))<1e-12,
+          abs(sum(stationary*grid)-.5)<1e-12)
+knitr::kable(data.frame(a_copies=states,frequency=grid,
+                       stationary_probability=stationary),digits=4,row.names=FALSE)
+```
+
+```{r}
+#| label: fig-mutation-drift-stationary
+#| fig-cap: "A stationary count distribution under symmetric reversible mutation and neutral Wright–Fisher sampling. The mean frequency is one half, but the population fluctuates over count states."
+#| fig-width: 8
+#| fig-height: 4
+barplot(setNames(stationary,states),col="#247BA0",xlab="a copies among ten",
+        ylab="Stationary probability")
+```
+
+Symmetry gives a stationary mean frequency of one half. This does not imply that all populations have maximum diversity $2q(1-q)=0.5$. Compute diversity within each state before averaging; the nonlinear function of the mean gives a different answer.
+
+## 5. Derive the diversity balance for this model
+
+Let $H(q)=2q(1-q)$, the probability that two independently drawn gene copies with replacement differ at this biallelic locus. It is the same marker-frequency definition used in earlier practicals, not a realized diploid genotype count.
+
+Mutation gives
+
+$$H(q_m)=2\mu(1-\mu)+(1-2\mu)^2H(q).$$
+
+Binomial sampling multiplies its conditional expectation by $c=1-1/M$. Therefore
+
+$$E(H_{t+1})=c\left[2\mu(1-\mu)+(1-2\mu)^2E(H_t)\right].$$
+
+The stationary value is
+
+$$\overline H=
+\frac{c\,2\mu(1-\mu)}{1-c(1-2\mu)^2}.$$
+
+```{r}
+#| label: diversity-balance
+c_drift <- 1-1/M
+H <- 2*grid*(1-grid)
+H_stationary <- c_drift*2*mu*(1-mu)/(1-c_drift*(1-2*mu)^2)
+H_from_distribution <- sum(stationary*H)
+H_from_mean_frequency <- 2*.5*(1-.5)
+stopifnot(abs(H_stationary-H_from_distribution)<1e-12,
+  max(abs(drop(P %*% H)-c_drift*(2*mu*(1-mu)+(1-2*mu)^2*H)))<1e-12,
+  H_from_distribution<H_from_mean_frequency)
+c(stationary_mean_HE=H_from_distribution,HE_at_mean_frequency=H_from_mean_frequency)
+```
+
+The matrix calculation independently verifies the moment recursion in every count state. A small number of simulated paths would not be needed to estimate this stationary expectation, because the complete finite distribution is available here.
+
+**Question 1.** Why does stationary mean frequency 0.5 not imply mean heterozygosity 0.5?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Frequency varies across stationary populations. Since $E[2q(1-q)]=2E(q)(1-E(q))-2\operatorname{Var}(q)$, the mean diversity is below the value calculated at the mean frequency whenever frequencies vary. Averaging a nonlinear summary requires averaging the summary itself.
+:::
+
+## 6. Match the diversity formula to the mutation model
+
+The slide expression $4N_e\mu/(1+4N_e\mu)$ is a familiar neutral mutation–drift approximation when mutation creates new allele identities under an infinite-alleles model. See the infinite-alleles comparison in [Engelstädter (2017)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5499200/). It is not the exact formula for the reversible two-allele process above. A two-allele independent-copy diversity measure cannot exceed 0.5, whereas an infinite-alleles measure can exceed 0.5 because there can be more than two states.
+
+```{r}
+#| label: mutation-model-contrast
+rates <- c(.001,.01,.05,.1)
+comparison <- data.frame(mu=rates,
+  two_allele_HE=c_drift*2*rates*(1-rates)/(1-c_drift*(1-2*rates)^2),
+  infinite_alleles_approx=4*N*rates/(1+4*N*rates))
+stopifnot(all(comparison$two_allele_HE<=.5),
+          any(comparison$infinite_alleles_approx>.5))
+knitr::kable(comparison,digits=4,row.names=FALSE)
+```
+
+The last column displays that approximation under a different mutation-state model, using the same numerical population parameter for comparison. It is not a qualified infinite-alleles simulation, and the large teaching rates are outside the small-rate regime motivating the approximation. Do not substitute either expression into a different locus, mutation or population model without stating its assumptions.
+
+## 7. Equilibrium and stationarity answer different questions
+
+The mutation–selection example has an interior deterministic frequency at which opposing changes balance. The finite neutral example has a stationary distribution in which individual populations keep changing. Adding both selection and drift to the same model creates another problem: its stationary or transient behavior must be evaluated under that combined transition model.
+
+Without mutation, the neutral finite process has absorbing loss and fixation states. With positive reversible mutation, those states are not absorbing. An allele can be absent in one sampled generation and reintroduced later; positive long-run diversity does not require polymorphism in every population at every time.
+
+## Exercises
+
+1. Verify the stationary frequency-variance identity from Question 1.
+2. Remove mutation from the transition model and check that loss and fixation are absorbing. Is there a unique stationary distribution?
+3. In the deterministic model, remove selection and derive the one-way mutation trajectory. What happens to the interior mutation–selection balance?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+mean_q <- sum(stationary*grid)
+variance_q <- sum(stationary*(grid-mean_q)^2)
+stopifnot(abs(H_from_distribution-(2*mean_q*(1-mean_q)-2*variance_q))<1e-12)
+P0 <- t(vapply(grid,function(q) dbinom(states,M,q),numeric(M+1L)))
+stopifnot(P0[1,1]==1,P0[M+1,M+1]==1)
+t <- 0:20
+q0 <- .2
+closed_form <- 1-(1-q0)*(1-u)^t
+recursive <- numeric(length(t)); recursive[1] <- q0
+for(i in 2:length(t)) recursive[i] <- balance_step(recursive[i-1],u,0,.5)
+stopifnot(max(abs(recursive-closed_form))<1e-12)
+```
+Any mixture of point masses at loss and fixation is stationary when mutation is absent, so the stationary distribution is not unique. With one-way mutation and no selection, the deterministic frequency tends to one; there is no interior balance removing the incoming a copies.
+:::
+
+## Package connection and next topic
+
+`gpop` owns population-model expectations and summary assumptions. The base-R recursions and small transition matrix here are teaching calculations, not new exported methods. Biological multi-locus simulation remains with `gsim`; breeding objectives and policies remain with `gsel`.
+
+Use the [course map](https://psoerensen.github.io/quantitative-genetics/tutorials/course_map.html) to choose the next application. Conservation genetics is a useful synthesis of drift, diversity, mating, inbreeding and explicit management constraints.

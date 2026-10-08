@@ -11,6 +11,7 @@ project:
     - tutorials/genetic_drift.qmd
     - tutorials/selection_fitness.qmd
     - tutorials/testing_hwe.qmd
+    - tutorials/mutation_balance.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -45,6 +46,8 @@ website:
             href: tutorials/selection_fitness.html
           - text: "8. Testing HWE proportions"
             href: tutorials/testing_hwe.html
+          - text: "9. Mutation, selection and drift at balance"
+            href: tutorials/mutation_balance.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

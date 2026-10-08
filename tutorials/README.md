@@ -14,6 +14,8 @@
 
 - [Testing Hardy–Weinberg proportions](testing_hwe.qmd): Practical 8, fitted expectations, degrees of freedom and exact conditional testing.
 
+- [Mutation, selection and drift at balance](mutation_balance.qmd): Practical 9, deterministic recursions and an exact small neutral transition model.
+
 All use base R and hypothetical data, with no required downloads or package installations. gpop links refer to its existing teaching examples, not proposed scientific APIs.
 
 Render an individual page from the repository root:
