@@ -7,6 +7,15 @@ subtitle: "Foundations of Genetic Variation and Evolutionary Change"
 
 This course introduces the principles used to describe genetic variation within and among populations. It examines allele and genotype frequencies, Hardy-Weinberg equilibrium, mating systems, genetic drift, migration, mutation, selection, linkage disequilibrium, and population history.
 
+## Core Topics
+
+- **Genetic data and diversity:** distinguish alleles, genotypes, haplotypes and phase; calculate frequencies and diversity measures in [Practicals 1–4](tutorials/genotype_data.qmd).
+- **Population change:** compare mutation, migration, recombination, drift and selection models in [Practicals 5–7](tutorials/mutation_migration_ld.qmd).
+- **Statistical inference and equilibrium:** assess HWE proportions and distinguish deterministic balance from stationary variation in [Practicals 8–9](tutorials/testing_hwe.qmd).
+- **Applications:** connect the models to conservation choices, DNA-profile probabilities, molecular clocks and genotype-specific phenotype probabilities in [Practicals 10–13](tutorials/conservation_genetics.qmd).
+
+An HWE test can detect incompatibility with its sampling and null model; a departure alone cannot identify its cause. Selective-sweep signatures and worked coalescent history remain further teaching extensions rather than completed analyses in this sequence.
+
 ## Learning Objectives
 
 After completing the course, students should be able to:
@@ -65,6 +74,12 @@ The repository includes the following R/Shiny app source files for local use. Th
 - [Migration and admixture simulator](apps/Migration_Admixture_Simulator.R)
 - [Selection simulator](apps/Selection_Simulator.R)
 - [Selective sweep simulator](apps/Selective_Sweep_Simulator.R)
+
+## Using the Materials
+
+Read the slides for a conceptual overview, then use a practical to work through assumptions, equations and interpretation. Treat R as a virtual laboratory: reproduce the example, predict the effect of changing one parameter, then compare that prediction with the result. Attempt the exercises before opening the solutions.
+
+For independent study and exam preparation, use the [shared course map](https://psoerensen.github.io/quantitative-genetics/tutorials/course_map.html) to choose a route and explain the population, denominator, life cycle and sampling model behind each calculation. Project analyses need their own data checks and model assessment before teaching code is adapted.
 
 ## Course Hub
 

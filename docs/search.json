@@ -1727,5 +1727,19 @@
     "title": "Disease alleles, penetrance and population risk",
     "section": "Package connections and teaching extensions",
     "text": "Package connections and teaching extensions\nThe examples illustrate genotype-frequency expectations and conditioning relevant to gpop; they do not assume an exported medical-risk API. gsim can extend known crosses to explicit inheritance simulations, while fitness effects and selection policies require separate definitions. Penetrance is a phenotype probability and is not automatically a reproductive fitness weight.\nUseful extensions include an explicitly specified age-dependent phenotype model, several alleles at one locus or a sampling model for uncertain allele frequencies. Each requires additional assumptions rather than substituting a new number into q squared."
+  },
+  {
+    "objectID": "index.html#core-topics",
+    "href": "index.html#core-topics",
+    "title": "Population Genetics",
+    "section": "Core Topics",
+    "text": "Core Topics\n\nGenetic data and diversity: distinguish alleles, genotypes, haplotypes and phase; calculate frequencies and diversity measures in Practicals 1–4.\nPopulation change: compare mutation, migration, recombination, drift and selection models in Practicals 5–7.\nStatistical inference and equilibrium: assess HWE proportions and distinguish deterministic balance from stationary variation in Practicals 8–9.\nApplications: connect the models to conservation choices, DNA-profile probabilities, molecular clocks and genotype-specific phenotype probabilities in Practicals 10–13.\n\nAn HWE test can detect incompatibility with its sampling and null model; a departure alone cannot identify its cause. Selective-sweep signatures and worked coalescent history remain further teaching extensions rather than completed analyses in this sequence."
+  },
+  {
+    "objectID": "index.html#using-the-materials",
+    "href": "index.html#using-the-materials",
+    "title": "Population Genetics",
+    "section": "Using the Materials",
+    "text": "Using the Materials\nRead the slides for a conceptual overview, then use a practical to work through assumptions, equations and interpretation. Treat R as a virtual laboratory: reproduce the example, predict the effect of changing one parameter, then compare that prediction with the result. Attempt the exercises before opening the solutions.\nFor independent study and exam preparation, use the shared course map to choose a route and explain the population, denominator, life cycle and sampling model behind each calculation. Project analyses need their own data checks and model assessment before teaching code is adapted."
   }
 ]
