@@ -1,0 +1,230 @@
+---
+title: "Population structure, mating and inbreeding"
+subtitle: "Population Genetics Practical 3: Different mechanisms behind genotype proportions"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Calculate offspring genotype expectations under specified mating rules; distinguish identity by state from identity by descent; explain the inbreeding genotype model; and show how population structure can create a pooled heterozygote deficit without within-population inbreeding.
+
+Continue from [Practical 2](allele_frequencies_hwe.qmd). Read alongside the slides on [random mating](../slides/introduction_population_genetics.qmd#random-mating-and-hardyweinberg), [population structure](../slides/introduction_population_genetics.qmd#spatial-mating-and-population-structure), [identity by descent](../slides/introduction_population_genetics.qmd#inbreeding-and-identity-by-descent-ibd) and [genotype frequencies under inbreeding](../slides/introduction_population_genetics.qmd#genotype-frequencies-under-inbreeding).
+
+All examples use base R and hypothetical populations. We calculate deterministic expectations, not biological realizations or fitted inbreeding estimates.
+
+## 1. Specify the mating rule
+
+A parent with genotype AA transmits A with probability 1, AB with probability 0.5, and BB with probability 0. For a specified pair of parents with transmission probabilities $t_1,t_2$, Mendelian transmission gives
+
+$$P(AA)=t_1t_2,\quad P(AB)=t_1(1-t_2)+(1-t_1)t_2,\quad
+P(BB)=(1-t_1)(1-t_2).$$
+
+These are probabilities at one locus. They do not state that a parent's whole genome is sampled independently at every marker.
+
+```{r}
+#| label: cross-probabilities
+cross_probabilities <- function(t1,t2) {
+  c(AA=t1*t2,AB=t1*(1-t2)+(1-t1)*t2,BB=(1-t1)*(1-t2))
+}
+crosses <- rbind(AA_by_BB=cross_probabilities(1,0),
+                 AB_by_AB=cross_probabilities(.5,.5))
+crosses
+stopifnot(identical(unname(crosses["AA_by_BB",]),c(0,1,0)),
+          identical(unname(crosses["AB_by_AB",]),c(.25,.5,.25)))
+```
+
+**Question 1.** Can an offspring population have heterozygosity above 0.5?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Yes. AA-by-BB crosses produce AB offspring with probability 1. The maximum of 0.5 in $2pq$ applies to random union of gametes from one common pool, not every mating rule.
+:::
+
+### Compare random pairing and pairing by genotype
+
+Suppose adult genotype proportions are HWE proportions at $p_A=0.6$. Under random pairing, pair weights are the products of adult genotype frequencies. Under a hypothetical same-genotype rule, AA pairs only with AA, AB with AB, and BB with BB. Each genotype contributes parents in proportion to its adult frequency, and every pair has equal reproductive output.
+
+```{r}
+#| label: mating-rules
+p <- 0.6
+q <- 1-p
+adult <- c(AA=p^2,AB=2*p*q,BB=q^2)
+transmission <- c(AA=1,AB=.5,BB=0)
+random_pairs <- outer(adult,adult)
+same_genotype_pairs <- diag(adult)
+# Pair weights sum to one; rows/columns refer to the two parental roles.
+offspring_expectation <- function(pair_weights) {
+  stopifnot(all(pair_weights >= 0),abs(sum(pair_weights)-1)<1e-12)
+  result <- c(AA=0,AB=0,BB=0)
+  for(i in 1:3) for(j in 1:3) {
+    result <- result + pair_weights[i,j]*
+      cross_probabilities(unname(transmission[i]),unname(transmission[j]))
+  }
+  result
+}
+random_offspring <- offspring_expectation(random_pairs)
+assortative_offspring <- offspring_expectation(same_genotype_pairs)
+knitr::kable(rbind(Adults=adult,Random_pairing=random_offspring,
+                   Same_genotype_pairing=assortative_offspring),digits=3)
+stopifnot(max(abs(random_offspring-adult))<1e-12,
+          max(abs(assortative_offspring-c(AA=.48,AB=.24,BB=.28)))<1e-12)
+# Recover A frequency from offspring genotype proportions.
+c(random_p_A=random_offspring["AA"]+random_offspring["AB"]/2,
+  assortative_p_A=assortative_offspring["AA"]+assortative_offspring["AB"]/2)
+```
+
+**Question 2.** Which quantity changes under the same-genotype rule: genotype proportions or allele frequency?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Genotype proportions change: heterozygosity falls from 0.48 to 0.24. A frequency remains 0.6 because parental allele contributions are unchanged. Unequal reproductive output or genotype-dependent selection could change it. This example specifies mating by genotype, not genealogical relatedness; its heterozygote deficit does not establish identity by descent.
+:::
+
+## 2. Distinguish state from descent
+
+Two A copies are **identical by state** because they have the same allele label. They are **identical by descent (IBD)** relative to a specified ancestral base if they descend from the same ancestral allele copy. A homozygous AA genotype alone does not identify which history produced it.
+
+For an individual, pedigree inbreeding $F$ is the probability that its two allele copies at a locus are IBD under the pedigree and founder assumptions. The additive relationship diagonal is $A_{ii}=1+F_i$; parental kinship is $A_{sd}/2$.
+
+### A small pedigree calculation
+
+Take two unrelated, noninbred founders, each with two distinct ancestral allele-copy identities. Two of their offspring are full siblings. If those siblings mate, their offspring can receive the same ancestral copy through both parents.
+
+For either sibling's transmitted copy, each of the four founder copies has probability 1/4 under Mendelian transmission. Averaging over the siblings' inheritance and transmissions, the probability of a match is $4(1/4)^2=1/4$.
+
+```{r}
+#| label: pedigree-ibd
+founder_copies <- c("sire_copy1","sire_copy2","dam_copy1","dam_copy2")
+transmitted_copy_probability <- setNames(rep(.25,4),founder_copies)
+F_fullsib_offspring <- sum(transmitted_copy_probability^2)
+c(F=F_fullsib_offspring,relationship_diagonal=1+F_fullsib_offspring)
+stopifnot(F_fullsib_offspring==.25)
+```
+
+This is an expectation from a declared pedigree, not the fraction of homozygous genotypes observed in one individual. Founders are assumed unrelated and noninbred relative to this base; changing the base or assumptions changes the interpretation.
+
+## 3. Derive the inbreeding genotype model
+
+Let A have frequency $p$ and B frequency $q=1-p$ in the reference pool. In the simple model, with probability $F$ both copies are IBD and share one ancestral draw; with probability $1-F$ they are independent draws from that pool. Then
+
+$$f_{AA}=Fp+(1-F)p^2=p^2+Fpq,$$
+$$f_{AB}=2pq(1-F),\qquad f_{BB}=q^2+Fpq.$$
+
+IBD pairs contribute no heterozygotes. Relative to HWE, each homozygote increases by $Fpq$, and AB decreases by $2Fpq$. This model preserves the supplied allele frequency; it is not a complete model of drift, selection or a multigeneration breeding programme.
+
+```{r}
+#| label: inbreeding-model
+inbreeding_proportions <- function(p,F) {
+  stopifnot(length(p)==1L,length(F)==1L,is.finite(p),is.finite(F),
+            p>=0,p<=1,F>=0,F<=1)
+  q <- 1-p
+  c(AA=p^2+F*p*q,AB=2*p*q*(1-F),BB=q^2+F*p*q)
+}
+F_values <- c(0,.25,1)
+model <- t(vapply(F_values,function(F) inbreeding_proportions(.6,F),numeric(3)))
+rownames(model) <- paste0("F=",F_values)
+knitr::kable(model,digits=3)
+stopifnot(all(abs(rowSums(model)-1)<1e-12),
+          all(abs(model[,"AA"]+model[,"AB"]/2-.6)<1e-12),
+          max(abs(model["F=0.25",]-c(AA=.42,AB=.36,BB=.22)))<1e-12)
+```
+
+```{r}
+#| label: fig-inbreeding
+#| fig-cap: "Genotype expectations at a fixed A frequency of 0.6 for three supplied IBD probabilities."
+barplot(t(model),col=c("#247BA0","#86B7A3","#D8A47F"),
+        xlab="Supplied inbreeding coefficient",ylab="Expected proportion",
+        legend.text=colnames(model),args.legend=list(x="topright",bty="n"))
+```
+
+**Question 3.** Why does complete homozygosity not imply that A is fixed?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+At $F=1$, the model gives AA proportion $p$ and BB proportion $q$, with no heterozygotes. Both alleles can remain present in different individuals. Homozygosity describes how copies are paired; fixation describes absence of an allele from the population.
+:::
+
+## 4. Pool populations with different frequencies
+
+Now consider two equally weighted populations. Each has HWE genotype expectations and no IBD inbreeding under its own specified base, but their A frequencies are 0.9 and 0.1. Pool records without allowing mating between the populations.
+
+```{r}
+#| label: population-mixture
+population_p <- c(Population1=.9,Population2=.1)
+weights <- c(Population1=.5,Population2=.5)
+within <- t(vapply(population_p,function(p) inbreeding_proportions(p,0),numeric(3)))
+pooled <- colSums(within*weights)
+p_pool <- sum(weights*population_p)
+pooled_hwe <- inbreeding_proportions(p_pool,0)
+knitr::kable(rbind(within,Pooled=pooled,Pooled_HWE=pooled_hwe),digits=3)
+H_within <- pooled["AB"]
+H_pooled_model <- pooled_hwe["AB"]
+weighted_variance_p <- sum(weights*(population_p-p_pool)^2)
+stopifnot(abs((H_pooled_model-H_within)-2*weighted_variance_p)<1e-12)
+c(pooled_p_A=p_pool,pooled_heterozygosity=H_within,
+  pooled_HWE_heterozygosity=H_pooled_model)
+```
+
+This is the **Wahlund effect**: pooling populations creates a heterozygote deficit relative to HWE at the pooled frequency, even when each population follows its own HWE expectation.
+
+For weights $w_k$ summing to one, $\bar p=\sum_k w_kp_k$. The difference is
+
+$$2\bar p(1-\bar p)-\sum_k w_k2p_k(1-p_k)
+=2\sum_k w_k(p_k-\bar p)^2.$$
+
+It is twice the weighted variance of population allele frequencies. In this toy example the pooled heterozygosity is 0.18, while the pooled HWE expectation is 0.5.
+
+## 5. The same proportions can have different explanations
+
+For nonzero expected heterozygosity, define the descriptive deficit ratio $D=1-H_O/H_E$. It summarizes a comparison with a chosen reference, but is not automatically a pedigree IBD probability or a calibrated inbreeding estimator.
+
+```{r}
+#| label: same-proportions
+deficit_ratio <- unname(1-H_within/H_pooled_model)
+matching_IBD_model <- inbreeding_proportions(p_pool,deficit_ratio)
+knitr::kable(rbind(Population_mixture=pooled,
+                   Supplied_IBD_model=matching_IBD_model),digits=3)
+deficit_ratio
+stopifnot(max(abs(pooled-matching_IBD_model))<1e-12,
+          abs(deficit_ratio-.64)<1e-12)
+```
+
+**Question 4.** Can these three genotype proportions establish that pedigree inbreeding is 0.64?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Our mixture has exactly the same proportions as a one-population IBD model supplied with $F=0.64$. The counts do not distinguish the mechanisms. Population labels, pedigree information, sampling design and additional genomic evidence may be needed, with explicit methods and reference definitions. A descriptive deficit ratio can also be negative under heterozygote excess; an IBD probability cannot.
+:::
+
+## Exercises
+
+1. At $p_A=0.5,F=0.25$, calculate the genotype proportions and recover allele frequency.
+2. Give both populations the same A frequency. What happens to the Wahlund deficit?
+3. Change mixture weights to 0.8 and 0.2. Calculate pooled frequency and compare heterozygosities.
+4. For AA-by-BB offspring, calculate the descriptive deficit relative to HWE at $p_A=0.5$. Why is it not a pedigree inbreeding coefficient?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+inbreeding_proportions(.5,.25)
+equal_frequency <- rbind(inbreeding_proportions(.6,0),inbreeding_proportions(.6,0))
+colMeans(equal_frequency)-inbreeding_proportions(.6,0)
+weights2 <- c(.8,.2)
+p2 <- sum(weights2*population_p)
+pooled2 <- colSums(within*weights2)
+c(pooled_p_A=p2,H_pooled=pooled2["AB"],H_HWE=2*p2*(1-p2))
+stopifnot(abs(p2-.74)<1e-12,
+          abs(unname(pooled2["AB"])-.18)<1e-12)
+1-1/(2*.5*.5)
+```
+The first proportions are 0.3125, 0.375 and 0.3125. Equal population frequencies remove the mixture deficit. Unequal weights change the pooled frequency to 0.74; pooled heterozygosity remains 0.18 here because both groups have the same heterozygosity. AA-by-BB offspring have deficit ratio $-1$, reflecting complete heterozygote excess, not negative IBD probability.
+:::
+
+## Package connections and the next topic
+
+Population summaries and reference-dependent expectations belong in `gpop`; current [gpop scientific interfaces remain proposed](https://github.com/psoerensen/gpop/blob/main/docs/design/scope.md). A supplied pedigree can be validated through `gsim` public interfaces, while biological inheritance remains a simulation responsibility. This practical adds no package APIs and does not turn a descriptive deficit into an estimator.
+
+The next topic is genetic diversity: observed heterozygosity, gene diversity, sample size and reference-population definitions.

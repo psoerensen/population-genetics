@@ -5,6 +5,7 @@ project:
     - index.qmd
     - tutorials/genotype_data.qmd
     - tutorials/allele_frequencies_hwe.qmd
+    - tutorials/structure_mating_inbreeding.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -27,6 +28,8 @@ website:
             href: tutorials/genotype_data.html
           - text: "2. Allele frequencies and HWE"
             href: tutorials/allele_frequencies_hwe.html
+          - text: "3. Structure, mating and inbreeding"
+            href: tutorials/structure_mating_inbreeding.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

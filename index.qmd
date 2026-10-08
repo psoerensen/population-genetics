@@ -33,6 +33,8 @@ After completing the course, students should be able to:
 - [Practical 1: Understanding genotype data](tutorials/genotype_data.qmd) — allele coding, identity alignment and haplotype phase.
 - [Practical 2: Allele frequencies and Hardy–Weinberg expectations](tutorials/allele_frequencies_hwe.qmd) — called denominators, observed heterozygosity and model expectations.
 
+- [Practical 3: Population structure, mating and inbreeding](tutorials/structure_mating_inbreeding.qmd) — mating rules, identity by descent and population-mixture effects.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.
