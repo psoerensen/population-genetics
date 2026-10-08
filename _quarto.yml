@@ -14,6 +14,7 @@ project:
     - tutorials/mutation_balance.qmd
     - tutorials/conservation_genetics.qmd
     - tutorials/dna_match_probabilities.qmd
+    - tutorials/molecular_clock.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -54,6 +55,8 @@ website:
             href: tutorials/conservation_genetics.html
           - text: "11. DNA profiles and match probabilities"
             href: tutorials/dna_match_probabilities.html
+          - text: "12. Sequence divergence and molecular clock"
+            href: tutorials/molecular_clock.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

@@ -50,6 +50,8 @@ After completing the course, students should be able to:
 
 - [Practical 11: DNA profiles and match probabilities](tutorials/dna_match_probabilities.qmd) — multi-allelic genotypes, population structure and evidence interpretation.
 
+- [Practical 12: Sequence divergence and the molecular clock](tutorials/molecular_clock.qmd) — comparable sites, substitution distances, rate units and calibration uncertainty.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

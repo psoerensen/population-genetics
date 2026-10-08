@@ -42,6 +42,10 @@ slides/introduction_population_genetics_narrated.qmd
 
 [Tutorial 11](tutorials/dna_match_probabilities.qmd) uses hypothetical allele frequencies to explore profile probabilities, population structure and source likelihood ratios. It uses base R and requires no downloads.
 
+## Molecular-clock practical
+
+[Tutorial 12](tutorials/molecular_clock.qmd) explores sequence differences, Jukes–Cantor distance and clock calibration using hypothetical inputs and base R.
+
 ## Included Apps
 
 The repository includes these R/Shiny app source files:

@@ -1,0 +1,193 @@
+---
+title: "Sequence divergence and the molecular clock"
+subtitle: "Population Genetics Practical 12: Distances, rates and calibration"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Count differences on a declared alignment denominator; distinguish observed differences from substitution distance; apply a simple correction for repeated substitutions; convert a per-lineage rate to pairwise time; and examine sampling and calibration uncertainty.
+
+This practical follows [the molecular-clock slides](../slides/introduction_population_genetics.qmd#the-molecular-clock-simple-version). Review [genotype data](genotype_data.qmd), [genetic diversity](genetic_diversity.qmd) and [mutation](mutation_migration_ld.qmd). All sequences, rates and calibrations below are hypothetical. The examples use base R without downloads.
+
+## 1. Declare the comparable sites
+
+An alignment specifies which positions are homologous. Here it is supplied rather than inferred. Count a difference only where both sequences have an unambiguous A, C, G or T. N and gaps are excluded; report their number rather than treating them as matches.
+
+```{r}
+#| label: alignment-differences
+sequence_A <- strsplit("ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT", "")[[1]]
+sequence_B <- sequence_A
+sequence_B[c(3,11,25,33)] <- c("A","A","T","G")
+sequence_B[c(5,6)] <- c("N","-")
+comparable <- sequence_A %in% c("A","C","G","T") &
+              sequence_B %in% c("A","C","G","T")
+L <- sum(comparable)
+K <- sum(sequence_A[comparable]!=sequence_B[comparable])
+p_hat <- K/L
+stopifnot(L==38,K==4)
+data.frame(aligned_positions=length(sequence_A),excluded=sum(!comparable),
+           comparable=L,differences=K,observed_fraction=p_hat)
+```
+
+The observed fraction $\hat p=K/L$ is often called the p-distance. It records different present-day states. It does not count every substitution along the path: a site can change more than once or return to its initial state.
+
+Our exclusion rule defines the analysis set. If missing sites differ systematically from retained sites, this set need not represent the whole sequence. Multiple pairwise comparisons also require attention to whether their denominators cover the same positions.
+
+## 2. Correct under a specified substitution model
+
+The Jukes–Cantor model assumes equal equilibrium base frequencies, equal instantaneous rates between distinct bases and a constant rate across sites and along the compared path. If $d$ is expected substitutions per site along that path,
+
+$$p(d)=\frac34\left(1-e^{-4d/3}\right).$$
+
+Inverting gives the distance estimate
+
+$$\hat d=-\frac34\log\left(1-\frac43\hat p\right),\qquad 0\leq\hat p<\frac34.$$
+
+This is a model-based correction, not a reconstruction of individual historical changes. The formula and finite-sample distance-estimation issues are discussed in [Improved variance estimators for one- and two-parameter models of nucleotide substitution](https://pmc.ncbi.nlm.nih.gov/articles/PMC2580800/).
+
+```{r}
+#| label: jukes-cantor-distance
+jc_distance <- function(p) {
+  stopifnot(is.numeric(p),all(is.finite(p)),all(p>=0),all(p<0.75))
+  -0.75*log1p(-4*p/3)
+}
+jc_difference <- function(d) {
+  stopifnot(is.numeric(d),all(is.finite(d)),all(d>=0))
+  -0.75*expm1(-4*d/3)
+}
+d_hat <- jc_distance(p_hat)
+stopifnot(d_hat>p_hat,abs(jc_difference(d_hat)-p_hat)<1e-12,
+          jc_distance(0)==0)
+c(observed_difference=p_hat,corrected_distance=d_hat)
+```
+
+```{r}
+#| label: saturation-plot
+d_grid <- seq(0,3,length.out=200)
+plot(d_grid,jc_difference(d_grid),type="l",lwd=2,col="#1b9e77",
+     xlab="Path distance: expected substitutions per site",
+     ylab="Expected fraction of different bases",ylim=c(0,0.8))
+abline(h=0.75,lty=2)
+points(d_hat,p_hat,pch=19)
+```
+
+At large distances, differences approach 0.75 even while substitutions continue accumulating. Near that limit, small changes in observed differences imply large changes in corrected distance. At or above 0.75, this inverse has no finite nonnegative distance estimate. Our helper rejects that input; it does not silently truncate it.
+
+**Question.** Does the correction establish that these short sequences evolved under Jukes–Cantor?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. The correction assumes the model. The short example illustrates its algebra and is not a model adequacy assessment. Unequal base composition, unequal substitution types or variation among sites may require other models.
+:::
+
+## 3. Keep rate units and the two-lineage factor explicit
+
+Let $r$ be the substitution rate per site per lineage per generation. Two lineages accumulating changes at this same rate for $t$ generations have total path distance
+
+$$d=rt+rt=2rt,\qquad t=d/(2r).$$
+
+A substitution rate describes evolutionary changes along a lineage. Equating it to a mutation rate requires an appropriate neutral model and assumptions; we supply a hypothetical substitution rate directly here.
+
+```{r}
+#| label: clock-units
+rate <- 1e-8
+# Generation length is supplied in years per generation.
+generation_years <- 2
+time_generations <- d_hat/(2*rate)
+time_years <- time_generations*generation_years
+data.frame(distance=d_hat,rate_per_site_per_lineage_per_generation=rate,
+           generations=time_generations,years=time_years)
+stopifnot(abs(2*rate*time_generations-d_hat)<1e-12)
+```
+
+The rate is per site, matching the distance units. The alignment length does not enter the conversion again. If a supplied rate were already a *pairwise* rate, another factor of two would be incorrect. For unequal lineage rates, $d=(r_1+r_2)t$ under the corresponding constant-rate model.
+
+This path-time calculation dates the common ancestry of the compared sequences under the model. A species split is a different event: ancestral polymorphism can make sequence common ancestry older than population separation. The simple example has no ancestral-population model, so its result is not a species-divergence estimate.
+
+## 4. Calibrate and examine sensitivity
+
+Suppose an independent comparison has a known hypothetical path-time of two million generations and corrected distance 0.04. Under the same strict two-lineage clock, it calibrates $r=0.04/(2\times2{,}000{,}000)$.
+
+```{r}
+#| label: calibration-sensitivity
+calibration_distance <- 0.04
+calibration_generations <- 2e6
+calibrated_rate <- calibration_distance/(2*calibration_generations)
+stopifnot(abs(calibrated_rate-rate)<1e-20)
+calibration_times <- c(1.5e6,2e6,2.5e6)
+calibration_rates <- calibration_distance/(2*calibration_times)
+data.frame(calibration_generations=calibration_times,
+           inferred_rate=calibration_rates,
+           target_generations=d_hat/(2*calibration_rates))
+```
+
+An older calibration at the same distance implies a slower rate and an older target time. These are sensitivity scenarios, not confidence limits. Transfer of a rate between comparisons assumes the same relevant evolutionary rate; this practical does not fit a relaxed clock or a phylogenetic tree.
+
+## 5. Isolate finite-site sampling uncertainty
+
+For this exercise, assume the $L$ retained sites are independent and share a common mismatch probability. Then $K$ is binomial. An exact binomial interval for $p$ can be transformed to distance and time when its endpoints remain below 0.75.
+
+```{r}
+#| label: conditional-sampling-interval
+p_interval <- unname(binom.test(K,L)$conf.int)
+stopifnot(p_interval[2]<0.75)
+d_interval <- jc_distance(p_interval)
+t_interval <- d_interval/(2*rate)
+data.frame(quantity=c("Mismatch probability","Distance","Generations"),
+           estimate=c(p_hat,d_hat,time_generations),
+           lower=c(p_interval[1],d_interval[1],t_interval[1]),
+           upper=c(p_interval[2],d_interval[2],t_interval[2]))
+```
+
+The transformed interval is conditional on independent equal-rate sites, the substitution model and the fixed rate. It does not include calibration, alignment or evolutionary-model uncertainty. If an upper endpoint reaches 0.75, a finite upper distance bound cannot be obtained by this inversion; clipping it would hide the problem.
+
+A small seeded simulation illustrates finite-site variation at a known distance. It simulates mismatch indicators under the declared model, rather than reconstructing sequence histories.
+
+```{r}
+#| label: finite-site-simulation
+set.seed(1201)
+true_distance <- 0.2
+true_p <- jc_difference(true_distance)
+lengths <- c(100,1000,10000)
+replicates <- 200
+estimated_p <- sapply(lengths,function(n) rbinom(replicates,n,true_p)/n)
+stopifnot(all(estimated_p<0.75))
+estimated_d <- matrix(jc_distance(as.vector(estimated_p)),nrow=replicates)
+boxplot(as.data.frame(estimated_d),names=lengths,
+        xlab="Independent retained sites",ylab="Estimated JC distance",
+        col="#7570b3")
+abline(h=true_distance,lty=2)
+```
+
+More independent sites reduce sampling variation in this example. They do not repair an incorrect clock or substitution model. The 200 draws are a teaching illustration, not a broad performance qualification.
+
+## Exercises
+
+1. Estimate time from raw p-distance instead of corrected distance. Explain the direction of the difference.
+2. Double the per-lineage rate while keeping distance fixed.
+3. Calculate the JC distance at mismatch fraction 0.7, and explain why estimates near 0.75 are unstable.
+4. Describe why a sequence common-ancestor time need not equal a species split time.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+c(time_from_raw_fraction=p_hat/(2*rate),
+  time_from_corrected_distance=d_hat/(2*rate),
+  time_at_double_rate=d_hat/(4*rate),
+  distance_at_p_0.7=jc_distance(0.7))
+```
+The raw fraction gives a smaller time under this model because it omits repeated substitutions. Doubling rate halves time. The correction grows rapidly near saturation: its derivative is $1/(1-4p/3)$. Lineages sampled from different species can trace back through an ancestral population before the species separation; dating that process needs additional assumptions and information.
+:::
+
+## Package connections and next steps
+
+These base R examples expose evolutionary-distance and sampling assumptions relevant to population-genetics teaching. They do not assume a `gpop` molecular-dating API. `gsim` breeding inheritance and `gsel` selection-policy responsibilities do not turn them into phylogenetic dating tools.
+
+A further extension could compare an explicit unequal-rate model or add an ancestral coalescent model. Each changes the meaning of the estimated time and should be introduced as a new model rather than another unit conversion.
