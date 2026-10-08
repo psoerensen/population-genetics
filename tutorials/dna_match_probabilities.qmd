@@ -1,0 +1,234 @@
+---
+title: "DNA profiles and match probabilities"
+subtitle: "Population Genetics Practical 11: Genotype frequencies, assumptions and evidence"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Calculate multi-allelic genotype probabilities; combine loci under an independence assumption; distinguish a fixed-profile match probability from agreement between two random profiles; examine population structure; and interpret a likelihood ratio under explicit source hypotheses.
+
+This practical follows the slides on [DNA forensics](../slides/introduction_population_genetics.qmd#dna-forensics). Review [allele frequencies and HWE](allele_frequencies_hwe.qmd), [population structure](structure_mating_inbreeding.qmd) and [linkage disequilibrium](mutation_migration_ld.qmd).
+
+Every frequency and profile below is hypothetical. We assume autosomal diploid loci, a complete single-source profile, correct allele calls, random union within the declared population and an unrelated alternative contributor. These calculations illustrate population-genetics reasoning rather than an operational forensic analysis.
+
+## 1. Describe a multi-allelic profile
+
+An STR allele label identifies a marker state; it is not a count of B alleles. A diploid genotype contains two labels at each locus. Our three teaching loci each have three possible alleles. The same label at different loci has no implication of shared ancestry.
+
+```{r}
+#| label: profile-inputs
+frequencies <- list(
+  L1=c(`10`=0.5, `11`=0.3, `12`=0.2),
+  L2=c(`8`=0.6, `9`=0.3, `10`=0.1),
+  L3=c(`14`=0.4, `15`=0.4, `16`=0.2)
+)
+profile <- list(L1=c("10","12"), L2=c("9","9"), L3=c("14","16"))
+stopifnot(identical(names(profile),names(frequencies)))
+data.frame(locus=names(profile),
+           genotype=vapply(profile,paste,character(1),collapse=" / "))
+```
+
+Treat the supplied frequencies as known parameters for this exercise. Reference databases in applications estimate them; finite sample size, sampling design and rare alleles introduce further uncertainty.
+
+## 2. Calculate genotype probabilities
+
+Under random union, a homozygote $a/a$ has probability $p_a^2$. A heterozygote $a/b$ has probability $2p_ap_b$: either parental ordering produces the same unordered genotype.
+
+```{r}
+#| label: genotype-probability
+check_frequencies <- function(p) {
+  stopifnot(is.numeric(p),length(p)>0,!is.null(names(p)),
+            !anyDuplicated(names(p)),all(is.finite(p)),all(p>=0),
+            abs(sum(p)-1)<1e-12)
+}
+genotype_probability <- function(g,p) {
+  check_frequencies(p)
+  stopifnot(length(g)==2,all(g %in% names(p)))
+  if (g[1]==g[2]) unname(p[g[1]]^2) else unname(2*p[g[1]]*p[g[2]])
+}
+probabilities <- vapply(names(profile), function(locus) {
+  genotype_probability(profile[[locus]],frequencies[[locus]])
+}, numeric(1))
+stopifnot(max(abs(probabilities-c(0.2,0.09,0.16)))<1e-12,
+          genotype_probability(c("12","10"),frequencies$L1)==probabilities[1])
+probabilities
+```
+
+Verify that all possible unordered genotypes at each locus exhaust probability one.
+
+```{r}
+#| label: enumerate-genotypes
+all_genotypes <- function(p) {
+  pairs <- expand.grid(a=names(p),b=names(p),stringsAsFactors=FALSE)
+  pairs <- pairs[match(pairs$a,names(p))<=match(pairs$b,names(p)),]
+  pairs$probability <- vapply(seq_len(nrow(pairs)),function(i) {
+    genotype_probability(c(pairs$a[i],pairs$b[i]),p)
+  },numeric(1))
+  pairs
+}
+stopifnot(all(vapply(frequencies,function(p) {
+  abs(sum(all_genotypes(p)$probability)-1)<1e-12
+},logical(1))))
+all_genotypes(frequencies$L1)
+```
+
+**Question.** Why is the heterozygote probability doubled, while the homozygote probability is not?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+For distinct alleles there are two ordered draws, a then b and b then a. For identical alleles there is only the a then a event. Counting it twice would make the genotype distribution sum to more than one.
+:::
+
+## 3. Combine independent loci for a fixed profile
+
+If genotypes at the loci are independent in the declared population, the probability that one unrelated random individual has this *specified* profile is
+
+$$r=P(G=g)=\prod_{\ell=1}^{L}P(G_\ell=g_\ell).$$
+
+```{r}
+#| label: fixed-profile-probability
+rmp <- prod(probabilities)
+stopifnot(abs(rmp-0.00288)<1e-12)
+c(random_match_probability=rmp, reciprocal=1/rmp)
+barplot(-log10(probabilities),names.arg=names(probabilities),
+        ylab="Contribution to -log10(profile probability)",col="#1b9e77")
+```
+
+The toy profile probability is 0.00288, about one in 347 under these assumptions. This deliberately short teaching panel does not illustrate the discriminatory power of a real marker panel. Multiplying probabilities requires independence; counting an identical duplicate marker twice would square a probability without adding information.
+
+For many loci, summing log probabilities avoids numerical underflow: $\log r=\sum_\ell\log P(G_\ell=g_\ell)$.
+
+```{r}
+#| label: log-probability-check
+stopifnot(abs(exp(sum(log(probabilities)))-rmp)<1e-12)
+```
+
+### Two random profiles answer a different question
+
+If two people are drawn independently from the same genotype distribution, their probability of matching at a locus is $\sum_g P(g)^2$. Across independent loci, multiply these sums.
+
+```{r}
+#| label: random-pair-agreement
+pair_match <- prod(vapply(frequencies,function(p) {
+  sum(all_genotypes(p)$probability^2)
+},numeric(1)))
+c(fixed_profile=rmp,two_random_profiles=pair_match)
+```
+
+The first calculation conditions on the supplied profile. The second averages over every possible first profile, including common ones. They need not coincide.
+
+## 4. Population structure changes the product calculation
+
+Imagine two hypothetical subpopulations, equally represented in a sampling population. Individuals belong to one subpopulation at all three loci. Genotypes are independent across loci *within* each subpopulation.
+
+```{r}
+#| label: subpopulation-frequencies
+pop_A <- frequencies
+pop_B <- list(L1=c(`10`=0.2,`11`=0.3,`12`=0.5),
+              L2=c(`8`=0.2,`9`=0.5,`10`=0.3),
+              L3=c(`14`=0.7,`15`=0.2,`16`=0.1))
+profile_probability <- function(freq) {
+  prod(vapply(names(profile),function(locus) {
+    genotype_probability(profile[[locus]],freq[[locus]])
+  },numeric(1)))
+}
+pooled <- Map(function(a,b) (a+b)/2,pop_A,pop_B)
+correct_mixture <- 0.5*profile_probability(pop_A)+0.5*profile_probability(pop_B)
+pooled_HWE_product <- profile_probability(pooled)
+# Even multiplying the correct marginal genotype probabilities loses shared ancestry.
+marginal_product <- prod(vapply(names(profile),function(locus) {
+  0.5*genotype_probability(profile[[locus]],pop_A[[locus]])+
+    0.5*genotype_probability(profile[[locus]],pop_B[[locus]])
+},numeric(1)))
+stopifnot(abs(correct_mixture-0.00494)<1e-12,
+          abs(pooled_HWE_product-correct_mixture)>1e-6,
+          abs(marginal_product-correct_mixture)>1e-6)
+c(mixture_of_profile_probabilities=correct_mixture,
+  pooled_frequency_HWE_product=pooled_HWE_product,
+  product_of_marginal_genotype_probabilities=marginal_product)
+```
+
+The mixture calculation first computes the complete profile probability within each population, then averages. Pooled allele frequencies assume random union across the mixture. Even using correct marginal genotype probabilities and multiplying them omits the common population membership across loci. Unlinked loci can therefore be statistically dependent in a pooled population.
+
+This example exposes an assumption rather than prescribing a correction for casework. It also does not supply the conditional distribution for a relative of the reference individual.
+
+## 5. Specify hypotheses before interpreting evidence
+
+Condition on the reference individual's known profile $g$. Define two source hypotheses:
+
+- $H_S$: the reference individual supplied the single-source sample.
+- $H_U$: an unrelated random individual from the declared population supplied it.
+
+Let $E$ be observing a complete matching profile. In the idealized error-free model, $P(E\mid H_S,g)=1$ and $P(E\mid H_U,g)=r$. Consequently,
+
+$$LR=\frac{P(E\mid H_S,g)}{P(E\mid H_U,g)}=\frac{1}{r}.$$
+
+```{r}
+#| label: source-likelihood-ratio
+LR <- 1/rmp
+LR
+```
+
+The reciprocal relationship holds for these particular hypotheses and observation assumptions. A related alternative contributor, uncertain calls or a mixture requires a different probability model. NIST's [DNA-mixture explainer](https://www.nist.gov/feature-stories/dna-mixtures-forensic-science-explainer) describes why mixtures and low-level samples involve additional interpretation.
+
+A likelihood ratio compares probabilities of evidence under hypotheses. It is not a probability that a source hypothesis is true. To illustrate the algebra, supply hypothetical prior source probabilities and apply Bayes' rule:
+
+$$P(H_S\mid E,g)=\frac{LR\,\pi}{LR\,\pi+(1-\pi)},$$
+
+where $\pi=P(H_S\mid g)$ and the two hypotheses exhaust this teaching model.
+
+```{r}
+#| label: hypothetical-prior-sensitivity
+prior <- c(0.001,0.01,0.5)
+posterior <- LR*prior/(LR*prior+1-prior)
+data.frame(hypothetical_prior=prior,posterior_source_probability=posterior)
+```
+
+The same LR gives different posteriors for different priors. These invented priors are not assigned to an actual person. Source attribution also does not specify how, when or why DNA arrived, or establish guilt. For the statistical distinctions, see the National Research Council's [Statistical Issues](https://www.ncbi.nlm.nih.gov/books/NBK232615/) chapter.
+
+## 6. Searching many unrelated profiles
+
+For a fixed target profile and $N$ independent unrelated draws with match probability $r$, the expected number of matches is $Nr$. The probability of at least one is
+
+$$1-(1-r)^N.$$
+
+```{r}
+#| label: repeated-profile-search
+N <- c(1,100,1000)
+data.frame(draws=N,expected_matches=N*rmp,
+           probability_at_least_one=-expm1(N*log1p(-rmp)))
+```
+
+This sampling exercise assumes independent draws from the specified population. It is not a database-search likelihood ratio or a posterior about someone selected by a search; those questions must include the selection procedure and hypotheses.
+
+## Exercises
+
+1. Replace L2's genotype with 8/9 and recompute the fixed-profile probability.
+2. Explain why multiplying probabilities for a marker and its identical duplicate is incorrect.
+3. Explain why the pooled-frequency calculation and the mixture calculation differ.
+4. Under which assumptions is the LR exactly the reciprocal of the match probability?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+changed <- profile
+changed$L2 <- c("8","9")
+changed_rmp <- prod(vapply(names(changed),function(locus) {
+  genotype_probability(changed[[locus]],frequencies[[locus]])
+},numeric(1)))
+stopifnot(abs(changed_rmp-0.01152)<1e-12)
+changed_rmp
+```
+The new probability is 0.01152. A duplicate marker is perfectly dependent on the first. Mixture membership is shared across loci, and pooling alleles also changes the random-union model. The reciprocal LR requires a matching, complete, correctly called single-source profile, a known reference profile, certainty of a match under the same-source hypothesis and the stated unrelated-random-source alternative.
+:::
+
+## Package connections
+
+These base R calculations illustrate probability models relevant to `gpop`. They do not assume an exported forensic API or introduce a forensic inference responsibility into `gsim` or `gsel`. Further teaching extensions could examine reference-sample uncertainty or an explicitly modelled related alternative; each requires declaring the sampling and conditioning assumptions first.

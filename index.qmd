@@ -48,6 +48,8 @@ After completing the course, students should be able to:
 
 - [Practical 10: Conservation genetics and management choices](tutorials/conservation_genetics.qmd) — contributions, kinship, marker diversity and resource constraints.
 
+- [Practical 11: DNA profiles and match probabilities](tutorials/dna_match_probabilities.qmd) — multi-allelic genotypes, population structure and evidence interpretation.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

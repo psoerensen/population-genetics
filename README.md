@@ -38,6 +38,10 @@ slides/introduction_population_genetics_narrated.qmd
 
 [Tutorial 10](tutorials/conservation_genetics.qmd) compares parental contributions, mating, expected inbreeding and marker heterozygosity under a hypothetical budget. It uses base R and requires no downloads.
 
+## DNA-profile practical
+
+[Tutorial 11](tutorials/dna_match_probabilities.qmd) uses hypothetical allele frequencies to explore profile probabilities, population structure and source likelihood ratios. It uses base R and requires no downloads.
+
 ## Included Apps
 
 The repository includes these R/Shiny app source files:
