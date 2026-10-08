@@ -37,6 +37,8 @@ After completing the course, students should be able to:
 
 - [Practical 4: Measuring genetic diversity](tutorials/genetic_diversity.qmd) — heterozygosity, sample correction and nucleotide diversity.
 
+- [Practical 5: Mutation, migration and linkage disequilibrium](tutorials/mutation_migration_ld.qmd) — deterministic expectations, haplotypes, admixture and recombination.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

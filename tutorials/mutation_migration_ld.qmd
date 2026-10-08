@@ -1,0 +1,241 @@
+---
+title: "Mutation, migration and linkage disequilibrium"
+subtitle: "Population Genetics Practical 5: Deterministic allele and haplotype recursions"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Calculate one-generation mutation and migration expectations; distinguish allele frequencies from phased haplotype frequencies; compute two-locus LD; and explain how admixture creates and recombination reduces allele associations.
+
+Continue from [Practical 4](genetic_diversity.qmd). Follow the slides on [mutation](../slides/introduction_population_genetics.qmd#mutation-source-and-measurement), [migration](../slides/introduction_population_genetics.qmd#migration-gene-flow-and-admixture), [recombination](../slides/introduction_population_genetics.qmd#recombination-and-new-haplotypes) and [LD](../slides/introduction_population_genetics.qmd#linkage-disequilibrium-ld).
+
+All examples are hypothetical base-R calculations. Parameters are illustrative, not estimates for a biological species. These deterministic recursions omit stochastic drift and selection unless stated; generations are discrete model steps, not calendar years.
+
+## 1. Mutation changes allele frequencies
+
+At one biallelic locus, let A have frequency $p$. Suppose A changes to a with probability $u$, and a changes to A with probability $v$ per generation. Then
+
+$$p'=p(1-u)+(1-p)v,\qquad \Delta p=v(1-p)-up.$$
+
+The first term retains A copies; the second gains A through reverse mutation. This two-state model does not represent all possible nucleotide substitutions or multiallelic mutation.
+
+```{r}
+#| label: mutation-step
+mutation_step <- function(p,u,v) {
+  stopifnot(all(is.finite(c(p,u,v))),all(c(p,u,v)>=0),all(c(p,u,v)<=1))
+  p*(1-u)+(1-p)*v
+}
+mutation_step(.3,.1,.2)
+stopifnot(abs(mutation_step(.3,.1,.2)-.41)<1e-12,
+          mutation_step(.3,0,0)==.3,
+          mutation_step(1,.1,0)==.9)
+```
+
+**Question 1.** If both mutation directions operate, what balances at equilibrium?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Loss $up$ equals gain $v(1-p)$. For $u+v>0$, the fixed point is $p^*=v/(u+v)$. Its approach depends on the recursion factor $1-u-v$. For the illustrative small rates below, this factor lies between zero and one and the trajectory approaches the fixed point monotonically.
+:::
+
+```{r}
+#| label: fig-mutation-trajectory
+#| fig-cap: "A deterministic mutation trajectory at illustrative rates, with the equilibrium frequency shown by a dashed line."
+u <- .02
+v <- .01
+steps <- 100L
+p_mutation <- numeric(steps+1L)
+p_mutation[1] <- .8
+for(t in seq_len(steps)) p_mutation[t+1L] <- mutation_step(p_mutation[t],u,v)
+p_equilibrium <- v/(u+v)
+closed_form <- p_equilibrium+(.8-p_equilibrium)*(1-u-v)^(0:steps)
+stopifnot(max(abs(p_mutation-closed_form))<1e-12)
+plot(0:steps,p_mutation,type="l",lwd=2,col="#247BA0",ylim=c(0,1),
+     xlab="Generation",ylab="A frequency")
+abline(h=p_equilibrium,lty=2,col="#B65C39")
+```
+
+Mutation supplies allele changes; the deterministic trajectory does not describe the fate of an individual new mutation in a finite population.
+
+## 2. Migration changes the reference pool
+
+Let a fraction $m$ of allele copies in the next pool come from a migrant source with A frequency $p_M$. The remainder comes from a resident pool with frequency $p$:
+
+$$p'=(1-m)p+mp_M.$$
+
+Here $m$ is the **gene-pool contribution**, not automatically the fraction of individuals moving. We specify the donor frequency at the migration step and assume equal allele-copy weighting within each pool.
+
+```{r}
+#| label: migration-step
+migration_step <- function(p,p_migrant,m) {
+  stopifnot(all(is.finite(c(p,p_migrant,m))),
+            all(c(p,p_migrant,m)>=0),all(c(p,p_migrant,m)<=1))
+  (1-m)*p+m*p_migrant
+}
+migration_step(.2,.8,.25)
+stopifnot(abs(migration_step(.2,.8,.25)-.35)<1e-12,
+          migration_step(.2,.8,0)==.2,
+          migration_step(.2,.8,1)==.8)
+```
+
+**Question 2.** Under repeated migration from a fixed donor, what happens to the difference between resident and donor frequencies?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+The difference is multiplied by $1-m$ at every step. For $0<m\leq1$, this simple replacement model approaches the donor frequency. Bidirectional migration, selection or a changing donor require a different recursion.
+:::
+
+## 3. Use phased haplotype frequencies for LD
+
+At two loci A/a and B/b, suppose the haplotypes are **known**. This is a supplied frequency model; it is not phase inferred from unphased dosages.
+
+```{r}
+#| label: haplotype-ld
+haplotypes <- c(AB=.4,Ab=.1,aB=.1,ab=.4)
+ld_summary <- function(h) {
+  stopifnot(identical(names(h),c("AB","Ab","aB","ab")),
+            all(is.finite(h)),all(h>=0),abs(sum(h)-1)<1e-12)
+  pA <- unname(h["AB"]+h["Ab"])
+  pB <- unname(h["AB"]+h["aB"])
+  D <- unname(h["AB"])-pA*pB
+  denominator <- pA*(1-pA)*pB*(1-pB)
+  c(p_A=pA,p_B=pB,D=D,
+    r_squared=if(denominator>0) D^2/denominator else NA_real_)
+}
+ld_summary(haplotypes)
+stopifnot(abs(ld_summary(haplotypes)["D"]-.15)<1e-12,
+          abs(ld_summary(haplotypes)["r_squared"]-.36)<1e-12)
+```
+
+The allele frequencies are the margins of the haplotype table. Define
+
+$$D=f_{AB}-p_Ap_B,\qquad
+r^2=\frac{D^2}{p_A(1-p_A)p_B(1-p_B)}.$$
+
+$r^2$ is defined here only when both loci are polymorphic. $D$ changes sign if one allele coding is reversed; $r^2$ does not. The physical linkage of two loci and their statistical association are different concepts. Association can also arise through population structure or other processes.
+
+**Question 3.** Why can allele frequencies of 0.5 at both loci fail to identify the AB haplotype frequency?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+The margins leave the joint association unspecified. Under independence AB has frequency 0.25; our supplied table gives 0.4. Many different haplotype tables share the same margins. Unphased genotype dosages contain still less direct information about chromosome pairing.
+:::
+
+## 4. Recombination reduces LD under a specified model
+
+For random mating, no selection, migration, mutation or drift, and recombination fraction $r$ between the loci, the gametic recursion is
+
+$$f'_{AB}=f_{AB}-rD,\quad f'_{Ab}=f_{Ab}+rD,$$
+$$f'_{aB}=f_{aB}+rD,\quad f'_{ab}=f_{ab}-rD.$$
+
+Allele frequencies are conserved and $D'=(1-r)D$. The recombination fraction lies between zero and 0.5 in this two-locus model; it is not a physical distance in base pairs.
+
+```{r}
+#| label: recombination-step
+recombination_step <- function(h,r) {
+  stopifnot(length(r)==1L,is.finite(r),r>=0,r<=.5)
+  D <- unname(ld_summary(h)["D"])
+  next_h <- h+r*D*c(-1,1,1,-1)
+  stopifnot(all(next_h>=-1e-12),abs(sum(next_h)-1)<1e-12)
+  next_h
+}
+next_h <- recombination_step(haplotypes,.1)
+rbind(Current=haplotypes,Next=next_h)
+stopifnot(max(abs(next_h-c(AB=.385,Ab=.115,aB=.115,ab=.385)))<1e-12,
+          max(abs(ld_summary(next_h)[c("p_A","p_B")]-
+                  ld_summary(haplotypes)[c("p_A","p_B")]))<1e-12,
+          abs(ld_summary(next_h)["D"]-.9*.15)<1e-12)
+```
+
+```{r}
+#| label: fig-ld-decay
+#| fig-cap: "Deterministic LD decay at three recombination fractions. Allele frequencies remain fixed in this model."
+generations <- 0:20
+rates <- c(0,.1,.5)
+D0 <- unname(ld_summary(haplotypes)["D"])
+D_curves <- vapply(rates,function(r) D0*(1-r)^generations,numeric(21))
+matplot(generations,D_curves,type="l",lty=1,lwd=2,
+        col=c("#247BA0","#86B7A3","#B65C39"),
+        xlab="Generation",ylab="D")
+legend("topright",paste("r =",rates),lty=1,lwd=2,
+       col=c("#247BA0","#86B7A3","#B65C39"),bty="n")
+# Verify the iterative haplotype update against the closed-form trajectory.
+h <- haplotypes
+for(t in 1:20) h <- recombination_step(h,.1)
+stopifnot(abs(ld_summary(h)["D"]-D0*.9^20)<1e-12)
+```
+
+**Question 4.** Do unlinked loci ($r=0.5$) lose all LD in one generation?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Existing gametic LD is halved under this recursion. Independence is approached over generations when no other process creates association. A larger physical separation does not by itself establish that a sampled population is in linkage equilibrium.
+:::
+
+## 5. Admixture can create LD
+
+Construct two populations, each with independent alleles across the two loci. In one, A and B both have frequency 0.9; in the other, both have frequency 0.1. Mix equal contributions of their haplotypes.
+
+```{r}
+#| label: admixture-ld
+independent_haplotypes <- function(pA,pB) {
+  c(AB=pA*pB,Ab=pA*(1-pB),aB=(1-pA)*pB,ab=(1-pA)*(1-pB))
+}
+h1 <- independent_haplotypes(.9,.9)
+h2 <- independent_haplotypes(.1,.1)
+h_mixed <- .5*h1+.5*h2
+knitr::kable(rbind(Population1=h1,Population2=h2,Mixed=h_mixed),digits=3)
+rbind(Population1=ld_summary(h1),Population2=ld_summary(h2),
+      Mixed=ld_summary(h_mixed))
+stopifnot(abs(ld_summary(h1)["D"])<1e-12,
+          abs(ld_summary(h2)["D"])<1e-12,
+          abs(ld_summary(h_mixed)["D"]-.16)<1e-12)
+```
+
+Both populations have zero D, but the mixture has D=0.16. A chromosome's population of origin makes the alleles at its two loci associated in the mixture. This mirrors the reference-population issue in the Wahlund example, but describes **association across loci**, not heterozygosity within a locus. Subsequent recombination reduces that mixture association under the earlier assumptions.
+
+## Exercises
+
+1. Start with $p_A=0.2$, use migrant frequency 0.8 and contribution 0.25, and repeat five migration steps. Check a closed-form expression.
+2. Reverse A/a in the supplied haplotype table. Verify the sign of D and the value of $r^2$.
+3. Apply recombination with $r=0$ and with $r=0.5$ to the mixed population. What is conserved?
+4. Apply mutation ($u=0.1,v=0.2$) and migration ($m=0.25,p_M=0.8$) in opposite orders to a pool starting at $p=0.2$. Why should a life cycle specify the order?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+p_migration <- .2
+for(t in 1:5) p_migration <- migration_step(p_migration,.8,.25)
+closed_migration <- .8+(.2-.8)*.75^5
+stopifnot(abs(p_migration-closed_migration)<1e-12)
+p_migration
+reversed <- setNames(unname(haplotypes[c("aB","ab","AB","Ab")]),
+                     c("AB","Ab","aB","ab"))
+ld_summary(reversed)
+stopifnot(abs(ld_summary(reversed)["D"]+D0)<1e-12,
+          abs(ld_summary(reversed)["r_squared"]-.36)<1e-12)
+rbind(No_recombination=ld_summary(recombination_step(h_mixed,0)),
+      Free_recombination=ld_summary(recombination_step(h_mixed,.5)))
+mutation_after_migration <- mutation_step(migration_step(.2,.8,.25),.1,.2)
+migration_after_mutation <- migration_step(mutation_step(.2,.1,.2),.8,.25)
+c(migration_then_mutation=mutation_after_migration,
+  mutation_then_migration=migration_after_mutation)
+stopifnot(abs(mutation_after_migration-.445)<1e-12,
+          abs(migration_after_mutation-.455)<1e-12)
+```
+Reversing one locus preserves $r^2$ but changes the sign of D. Recombination preserves both allele margins and total haplotype frequency. The combined recursions give different results because the migration contribution has specified frequency at the migration step, and the pools subjected to mutation differ between the two life cycles. Order and the stage at which parameters are defined belong in the model.
+:::
+
+## Package and app connections
+
+`gpop` owns deterministic population expectations and population summaries; its [scientific interfaces remain proposed](https://github.com/psoerensen/gpop/blob/main/docs/design/scope.md). These calculations introduce no package API. Biological inheritance and stochastic population realizations belong in `gsim` when a supported model is specified.
+
+The existing [migration/admixture Shiny app](../apps/Migration_Admixture_Simulator.R) is an optional local exploration with its existing dependencies; it is not a deployed web app. This practical does not change or qualify its implementation.
+
+## Next practical
+
+Next compare deterministic expectations with genetic drift in finite populations, then examine selection and fitness. A trajectory expected under a model is different from one stochastic realization.

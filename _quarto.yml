@@ -7,6 +7,7 @@ project:
     - tutorials/allele_frequencies_hwe.qmd
     - tutorials/structure_mating_inbreeding.qmd
     - tutorials/genetic_diversity.qmd
+    - tutorials/mutation_migration_ld.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -33,6 +34,8 @@ website:
             href: tutorials/structure_mating_inbreeding.html
           - text: "4. Genetic diversity"
             href: tutorials/genetic_diversity.html
+          - text: "5. Mutation, migration and LD"
+            href: tutorials/mutation_migration_ld.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 
