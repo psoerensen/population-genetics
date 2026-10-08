@@ -4,7 +4,7 @@ Standalone Quarto- and R-based teaching materials for population genetics.
 
 Published website: <https://psoerensen.github.io/population-genetics/>
 
-Teaching-materials hub: <https://psoerensen.github.io/qgteach/>
+Teaching-materials hub: <https://psoerensen.github.io/gteach/>
 
 ## Repository Structure
 

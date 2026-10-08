@@ -87,4 +87,4 @@ For independent study and exam preparation, use the [shared course map](https://
 
 ## Course Hub
 
-Return to the [qgteach teaching-materials hub](https://psoerensen.github.io/qgteach/).
+Return to the [gteach teaching-materials hub](https://psoerensen.github.io/gteach/).

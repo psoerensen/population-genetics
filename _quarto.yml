@@ -68,8 +68,8 @@ website:
             href: tutorials/selective_sweeps.html
           - text: "15. Coalescent history"
             href: tutorials/coalescent_history.html
-      - text: "qgteach"
-        href: https://psoerensen.github.io/qgteach/
+      - text: "gteach"
+        href: https://psoerensen.github.io/gteach/
 
 format:
   html:
