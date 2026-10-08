@@ -3,6 +3,8 @@ project:
   output-dir: docs
   render:
     - index.qmd
+    - tutorials/genotype_data.qmd
+    - tutorials/allele_frequencies_hwe.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -19,6 +21,12 @@ website:
         href: slides/introduction_population_genetics.html
       - text: "Narrated slides"
         href: slides/introduction_population_genetics_narrated.html
+      - text: "Tutorials"
+        menu:
+          - text: "1. Genotype data"
+            href: tutorials/genotype_data.html
+          - text: "2. Allele frequencies and HWE"
+            href: tutorials/allele_frequencies_hwe.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

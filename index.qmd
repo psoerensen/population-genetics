@@ -28,6 +28,11 @@ After completing the course, students should be able to:
 - [Population Genetics slides](slides/introduction_population_genetics.html)
 - [Narrated Population Genetics slides](slides/introduction_population_genetics_narrated.html)
 
+## Practicals
+
+- [Practical 1: Understanding genotype data](tutorials/genotype_data.qmd) — allele coding, identity alignment and haplotype phase.
+- [Practical 2: Allele frequencies and Hardy–Weinberg expectations](tutorials/allele_frequencies_hwe.qmd) — called denominators, observed heterozygosity and model expectations.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

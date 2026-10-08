@@ -1,0 +1,191 @@
+---
+title: "Understanding genotype data"
+subtitle: "Population Genetics Practical 1: Allele coding, missing calls and phase"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Read a genotype matrix; explain the counted allele and missing calls; align individuals and markers by identity; and distinguish unphased genotypes from haplotypes.
+
+Use this practical alongside the slides on [the genotype matrix](../slides/introduction_population_genetics.qmd#the-genotype-matrix) and [haplotypes and phase](../slides/introduction_population_genetics.qmd#linked-loci-haplotypes-and-phase). You need basic Mendelian genetics and introductory R. The example uses base R and hypothetical data, with no downloads or package installation.
+
+## 1. From two alleles to one dosage
+
+At a diploid biallelic locus, each individual has two allele copies. Suppose the labels are A and B, and we choose **A as the counted allele**.
+
+| Genotype | Copies of A | Copies of B |
+| --- | --- | --- |
+| AA | 2 | 0 |
+| AB | 1 | 1 |
+| BB | 0 | 2 |
+| Unobserved | `NA` | `NA` |
+
+A count of zero is an observed BB genotype. `NA` means the genotype is unknown. A and B name alleles; they do not establish dominance, causal effects or which allele is rarer.
+
+**Question 1.** Can a value of 1 identify which parent transmitted A?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. A dosage of 1 describes a heterozygote. It carries no parental-origin information. At multiple loci, dosages also do not establish which alleles occur on the same chromosome.
+:::
+
+## 2. Read a small genotype matrix
+
+Rows identify individuals and columns identify loci. At `L1`, dosage counts A; at `L2`, dosage counts C. These are hypothetical marker labels, not physical genome positions.
+
+```{r}
+#| label: genotype-matrix
+M <- cbind(L1 = c(2L, 1L, NA_integer_, 0L, 1L, 2L),
+           L2 = c(0L, 1L, 2L, 2L, NA_integer_, 1L))
+rownames(M) <- paste0("individual", 1:6)
+markers <- data.frame(marker=c("L1", "L2"),
+                      counted_allele=c("A", "C"),
+                      other_allele=c("B", "D"))
+stopifnot(!anyDuplicated(rownames(M)), !anyDuplicated(colnames(M)),
+          identical(colnames(M), markers$marker),
+          all(M[!is.na(M)] %in% 0:2))
+M
+markers
+```
+
+**Question 2.** Interpret both entries for `individual2`. How many called genotypes are available at each marker?
+
+```{r}
+#| label: inspect-calls
+M["individual2", ]
+data.frame(marker=colnames(M),
+           called=colSums(!is.na(M)),
+           missing=colSums(is.na(M)), row.names=NULL)
+```
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Individual 2 is AB at L1 and CD at L2. Each locus has five called individuals, but its missing call belongs to a different individual. A complete row is not required to summarize one locus; each locus has its own called denominator.
+:::
+
+### Visualize the coding
+
+```{r}
+#| label: fig-genotype-cells
+#| fig-cap: "Called dosages at two hypothetical loci. Gray cells are missing calls; the counted allele differs between columns."
+#| fig-width: 7
+#| fig-height: 5
+local({
+  old <- par(mar=c(4,7,3,1)); on.exit(par(old))
+  plot(NA,xlim=c(0.5,2.5),ylim=c(0.5,6.5),xaxt="n",yaxt="n",
+       xlab="Marker",ylab="",bty="n")
+  axis(1,at=1:2,labels=c("L1: A copies","L2: C copies"))
+  axis(2,at=6:1,labels=rownames(M),las=1)
+  colors <- c("#E1EEF3", "#86B7A3", "#247BA0")
+  for (i in 1:6) for (j in 1:2) {
+    value <- M[i,j]
+    fill <- if (is.na(value)) "#D9D9D9" else colors[value+1L]
+    rect(j-0.45,7-i-0.4,j+0.45,7-i+0.4,col=fill,border="white")
+    text(j,7-i,if(is.na(value)) "NA" else value,
+         col=if(!is.na(value) && value==2) "white" else "black")
+  }
+})
+```
+
+This practical uses called integer genotypes. Fractional dosages can represent expected allele counts from imputation; they do not identify hard genotype classes without a separate calling rule. Polyploid, multiallelic or haploid data also need different contracts.
+
+## 3. Keep identities and allele metadata aligned
+
+Row positions are not identities. Suppose a phenotype table arrives in another order.
+
+```{r}
+#| label: align-individuals
+records <- data.frame(individual=c("individual4","individual1","individual6"),
+                      hypothetical_trait=c(12,10,15))
+position <- match(records$individual,rownames(M))
+stopifnot(!anyNA(position), !anyDuplicated(records$individual))
+aligned <- M[position,,drop=FALSE]
+stopifnot(identical(rownames(aligned),records$individual))
+cbind(records,aligned)
+```
+
+**Question 3.** Why would selecting the first three matrix rows be incorrect here?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Those rows belong to individuals 1, 2 and 3, not the individuals listed in the records. Equal row counts do not guarantee a correct mapping. Marker metadata must similarly follow columns when they are reordered; physical positions and allele orientation cannot be inferred from matrix dimensions.
+:::
+
+## 4. Reverse the counted allele
+
+For diploid calls, B dosage is $2-$A dosage. Missing calls stay missing.
+
+```{r}
+#| label: reverse-allele
+A_copies <- M[,"L1"]
+B_copies <- 2L-A_copies
+comparison <- data.frame(individual=rownames(M), A_copies, B_copies)
+comparison
+stopifnot(identical(is.na(A_copies),is.na(B_copies)),
+          all((A_copies+B_copies)[!is.na(A_copies)]==2))
+```
+
+**Question 4.** Does changing the counted allele change the underlying individuals or their heterozygosity?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. The two homozygote labels exchange roles and heterozygotes remain heterozygotes. The reported counted-allele frequency changes to its complement. Always state the counted allele with a result; numeric dosages alone do not establish allele identity.
+:::
+
+## 5. Distinguish genotype from haplotype phase
+
+Individual 2 is heterozygous at both loci. Two possible chromosome pairs are
+
+| Phase configuration | Chromosome 1 | Chromosome 2 |
+| --- | --- | --- |
+| Coupling | A–C | B–D |
+| Repulsion | A–D | B–C |
+
+Both produce one A copy and one C copy, so both have the same unphased row `(1,1)`.
+
+```{r}
+#| label: phase-ambiguity
+coupling <- rbind(c("A","C"),c("B","D"))
+repulsion <- rbind(c("A","D"),c("B","C"))
+counted <- c("A","C")
+phase_dosage <- function(chromosomes) {
+  vapply(1:2,function(j) sum(chromosomes[,j]==counted[j]),integer(1))
+}
+rbind(coupling=phase_dosage(coupling), repulsion=phase_dosage(repulsion))
+stopifnot(identical(phase_dosage(coupling),phase_dosage(repulsion)))
+```
+
+**Question 5.** Can the matrix tell us whether individual 2 carries the A–C haplotype?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Phase information or a declared inference method is required. Frequencies of unphased allele counts are observed summaries; haplotype frequencies cannot be read directly from those counts. Dosage correlation should not automatically be called haplotype linkage disequilibrium.
+:::
+
+## Exercises
+
+1. Decode all called L1 entries as AA, AB or BB.
+2. Reorder the marker columns and align their metadata by marker identity.
+3. Replace the missing L1 call with zero. Explain why this changes the biological information rather than only the display.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+labels <- c("BB","AB","AA")
+decoded <- rep(NA_character_,length(A_copies))
+decoded[!is.na(A_copies)] <- labels[A_copies[!is.na(A_copies)]+1L]
+data.frame(individual=rownames(M),genotype=decoded)
+reordered <- M[,c("L2","L1"),drop=FALSE]
+metadata_reordered <- markers[match(colnames(reordered),markers$marker),]
+stopifnot(identical(colnames(reordered),metadata_reordered$marker))
+metadata_reordered
+```
+Replacing `NA` with zero asserts a known BB genotype. It adds two observed B allele copies and changes called denominators. Such a change needs a justified imputation/calling procedure, not a display preference.
+:::
+
+## Next practical and package connection
+
+[Practical 2](allele_frequencies_hwe.qmd) calculates allele/genotype frequencies and compares them with Hardy–Weinberg expectations. `gpop` owns population summaries and expectations; its current [teaching examples](https://github.com/psoerensen/gpop/tree/main/inst/examples) are base-R calculations, with scientific APIs still proposed. Biological genotype simulation belongs in `gsim`.

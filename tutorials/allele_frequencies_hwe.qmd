@@ -1,0 +1,220 @@
+---
+title: "Allele frequencies and Hardy–Weinberg expectations"
+subtitle: "Population Genetics Practical 2: Observed summaries and a random-union model"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Count alleles with correct missing-call denominators; distinguish allele frequencies, genotype frequencies and heterozygosity; derive HWE expectations; and explain why a finite-sample departure does not by itself establish disequilibrium or its cause.
+
+Continue from [Practical 1](genotype_data.qmd). Read alongside the slides on [genotype frequencies](../slides/introduction_population_genetics.qmd#genotype-frequencies), [allele frequencies](../slides/introduction_population_genetics.qmd#allele-frequencies) and [the Hardy–Weinberg law](../slides/introduction_population_genetics.qmd#from-alleles-to-genotypes-hardyweinberg-law). Use base R; the six hypothetical individuals are not biological study results.
+
+## 1. Count the called genotypes
+
+At our diploid biallelic locus, dosage counts copies of A: 2 means AA, 1 means AB and 0 means BB. The third individual has an unknown genotype.
+
+```{r}
+#| label: genotype-counts
+dosage <- c(2L,1L,NA_integer_,0L,1L,2L)
+called <- dosage[!is.na(dosage)]
+stopifnot(length(called)>0L,all(called %in% 0:2))
+counts <- c(AA=sum(called==2L),AB=sum(called==1L),BB=sum(called==0L))
+n_called <- length(called)
+n_missing <- sum(is.na(dosage))
+counts
+c(called=n_called,missing=n_missing,called_chromosomes=2*n_called)
+```
+
+**Question 1.** What is the genotype-frequency denominator? What is the allele-frequency denominator?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Five called individuals give the genotype denominator. Ten called allele copies give the allele denominator. The missing individual contributes neither a known genotype nor known allele copies. Excluding missing calls describes the called sample; it does not prove missingness is ignorable for population inference.
+:::
+
+## 2. Calculate observed frequencies and heterozygosity
+
+For called counts $n_{AA},n_{AB},n_{BB}$,
+
+$$\hat p_A=\frac{2n_{AA}+n_{AB}}{2n_c},\qquad
+\hat q_B=1-\hat p_A,\qquad H_O=\frac{n_{AB}}{n_c}.$$
+
+No HWE assumption is required for these observed summaries.
+
+```{r}
+#| label: observed-summaries
+observed <- counts/n_called
+p_A <- sum(called)/(2*n_called)
+q_B <- 1-p_A
+H_observed <- unname(observed["AB"])
+knitr::kable(data.frame(genotype=names(counts),count=counts,
+                       observed_frequency=observed),digits=3,row.names=FALSE)
+c(p_A=p_A,q_B=q_B,H_observed=H_observed)
+stopifnot(abs(p_A-0.6)<1e-12,abs(H_observed-0.4)<1e-12,
+          abs(sum(observed)-1)<1e-12)
+```
+
+```{r}
+#| label: fig-called-counts
+#| fig-cap: "Genotype counts among five called individuals. One missing call is excluded."
+barplot(counts,col=c("#247BA0","#86B7A3","#D8A47F"),
+        ylab="Called individuals",xlab="Genotype",ylim=c(0,3))
+```
+
+**Question 2.** Is the A frequency 0.6 the same quantity as the AA frequency 0.4?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Allele frequency counts allele copies, while genotype frequency counts individuals. Two AA individuals contribute four A copies, and two AB individuals contribute two more. Observed heterozygosity is the fraction of called individuals with AB, here 0.4.
+:::
+
+### Allele reversal and all-missing loci
+
+```{r}
+#| label: reverse-and-missing
+B_dosage <- 2L-dosage
+p_B_recounted <- sum(B_dosage,na.rm=TRUE)/(2*n_called)
+stopifnot(abs(p_B_recounted-q_B)<1e-12)
+p_B_recounted
+all_missing <- rep(NA_integer_,4)
+called_count <- sum(!is.na(all_missing))
+frequency <- if(called_count==0L) NA_real_ else
+  sum(all_missing,na.rm=TRUE)/(2*called_count)
+frequency
+```
+
+An all-missing locus has no called denominator: its frequency is undefined, not zero. A monomorphic called locus has a defined frequency of zero or one.
+
+## 3. Derive HWE expectations
+
+Assume two independently sampled gametes from one pool, each carrying A with probability $p$ and B with probability $q=1-p$. AA requires A from both gametes, giving $p^2$. AB has two ordered possibilities, A then B or B then A, giving $2pq$. BB has probability $q^2$.
+
+$$f_{AA}=p^2,\qquad f_{AB}=2pq,\qquad f_{BB}=q^2.$$
+
+The proportions sum to $(p+q)^2=1$. This describes genotype formation at supplied frequencies. Stable allele frequencies over generations require additional assumptions about selection, migration, mutation and drift. Random union of gametes does not force a small sample to match its expectations exactly.
+
+```{r}
+#| label: hwe-expectations
+expected <- c(AA=p_A^2,AB=2*p_A*q_B,BB=q_B^2)
+expected_counts <- n_called*expected
+H_expected <- unname(expected["AB"])
+knitr::kable(data.frame(genotype=names(counts),observed_count=counts,
+                       observed_proportion=observed,
+                       expected_proportion=expected,
+                       expected_count=expected_counts),digits=3,row.names=FALSE)
+stopifnot(max(abs(expected-c(AA=.36,AB=.48,BB=.16)))<1e-12)
+```
+
+**Question 3.** Why can expected counts be fractional? Should we round them to obtain the model's predicted sample?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Expected counts are averages over possible samples, not a particular realized sample. Here they are 1.8, 2.4 and 0.8. Rounding them would replace the model expectation with arbitrary integers.
+:::
+
+```{r}
+#| label: fig-observed-expected
+#| fig-cap: "Observed genotype proportions compared with HWE expectations at the sample's estimated A frequency."
+barplot(rbind(Observed=observed,Expected=expected),beside=TRUE,
+        col=c("#247BA0","#D8A47F"),ylim=c(0,0.65),ylab="Proportion")
+legend("topright",c("Observed","Expected"),
+       fill=c("#247BA0","#D8A47F"),bty="n")
+```
+
+Observed heterozygosity is `r H_observed`; plug-in expected heterozygosity is `r H_expected`. The same sample supplied both its allele-frequency estimate and observed counts. Their difference is descriptive, not automatically a calibrated test statistic or an inbreeding estimate.
+
+## 4. Explore the role of allele frequency
+
+```{r}
+#| label: fig-frequency-curves
+#| fig-cap: "HWE genotype expectations across supplied A frequencies. Heterozygosity is maximal when both alleles have frequency one half."
+p_grid <- seq(0,1,length.out=101)
+curves <- cbind(AA=p_grid^2,AB=2*p_grid*(1-p_grid),BB=(1-p_grid)^2)
+matplot(p_grid,curves,type="l",lty=1,lwd=2,
+        col=c("#247BA0","#86B7A3","#D8A47F"),
+        xlab="Frequency of A",ylab="Expected genotype proportion")
+legend("top",colnames(curves),lty=1,lwd=2,
+       col=c("#247BA0","#86B7A3","#D8A47F"),bty="n")
+```
+
+**Question 4.** Why is $H_E=2p(1-p)$ zero at fixation and maximal at $p=0.5$?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+At fixation only one allele is present, so different alleles cannot pair. Since $2p(1-p)=0.5-2(p-0.5)^2$, its maximum is 0.5 at equal allele frequencies. This describes random pairing; an observed sample or a nonrandom mating system need not have heterozygosity at most 0.5.
+:::
+
+## 5. Separate expectation from a finite realization
+
+Draw 20 small samples of five genotypes from the fixed model proportions. This is a seeded toy sampling calculation, not a simulated biological population or an HWE test.
+
+```{r}
+#| label: fig-finite-samples
+#| fig-cap: "Twenty possible five-individual samples from the fixed HWE model at p(A)=0.6. Finite genotype proportions vary."
+set.seed(20261008)
+samples <- rmultinom(20,size=n_called,prob=expected)
+stopifnot(all(colSums(samples)==n_called))
+barplot(samples/n_called,col=c("#247BA0","#86B7A3","#D8A47F"),
+        xlab="Toy sample",ylab="Realized genotype proportion",
+        legend.text=rownames(samples),args.legend=list(x="topright",bty="n"))
+```
+
+**Question 5.** Does a heterozygote deficit in one sample prove inbreeding?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Finite sampling, population mixtures, relatives, nonrandom mating or genotype errors can affect the comparison. Formal assessment requires a declared sampling model and a suitable test. Expected counts in this five-individual example are too small for an automatic large-sample chi-squared approximation. This practical does not conduct an HWE test or identify a cause of departure.
+:::
+
+## Exercises
+
+1. Replace the missing genotype with AB. Recalculate allele frequency and observed heterozygosity.
+2. Set every called genotype to AA. What happens to observed and expected heterozygosity?
+3. Reverse A and B in the HWE model. Which proportions change?
+4. Compare two equally weighted populations, one with $p_A=0.9$ and the other with $p_A=0.1$, each under HWE. Is pooled heterozygosity equal to the HWE expectation at the pooled frequency?
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+completed <- dosage
+completed[is.na(completed)] <- 1L
+c(p_A=mean(completed)/2,H_observed=mean(completed==1L))
+stopifnot(abs(mean(completed)/2-7/12)<1e-12,
+          mean(completed==1L)==0.5)
+fixed <- rep(2L,n_called)
+c(p_A=mean(fixed)/2,H_observed=mean(fixed==1L),
+  H_expected=2*(mean(fixed)/2)*(1-mean(fixed)/2))
+reversed_expected <- c(AA=q_B^2,AB=2*p_A*q_B,BB=p_A^2)
+reversed_expected
+subpopulation_p <- c(0.9,0.1)
+p_pool <- mean(subpopulation_p)
+H_within <- mean(2*subpopulation_p*(1-subpopulation_p))
+H_pool_model <- 2*p_pool*(1-p_pool)
+c(pooled_p_A=p_pool,within_population_H=H_within,
+  pooled_HWE_model_H=H_pool_model)
+stopifnot(abs(H_within-.18)<1e-12,abs(H_pool_model-.5)<1e-12)
+```
+The completed sample has $p_A=7/12$ and $H_O=0.5$. Fixation gives both heterozygosities zero. Allele reversal exchanges the homozygote proportions. The mixture retains within-population heterozygosity 0.18 while pooled HWE predicts 0.5; this is a Wahlund-effect illustration, not proof of pedigree inbreeding. Pooling groups does not create random mating between them.
+:::
+
+## Package and app connections
+
+The corresponding [gpop examples](https://github.com/psoerensen/gpop/tree/main/inst/examples) use the same five-called-individual calculation. They are base-R teaching scripts, not exported scientific functions. If gpop is already installed, its examples can be inspected independently:
+
+```{r}
+#| eval: false
+example_file <- system.file("examples","allele_frequencies.R",
+                            package="gpop",mustWork=TRUE)
+example_environment <- new.env()
+sys.source(example_file,envir=example_environment)
+example_environment$reference
+```
+
+For optional local exploration, the existing [Gene Pool and Hardy–Weinberg Explorer](../apps/GenePool_HWE_Simulator.R) and [random-mating simulator](../apps/hwe_simulation.R) provide Shiny interfaces. They require their existing Shiny/ggplot2 dependencies and are not deployed web apps. This tutorial does not change or qualify their implementations.
+
+## Connection to the next topic
+
+Next distinguish population structure, nonrandom mating and inbreeding, then study diversity and evolutionary forces. The central distinction remains: observed counts summarize data; expectations state a model; estimators and tests require additional assumptions.
