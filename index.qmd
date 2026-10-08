@@ -39,6 +39,9 @@ After completing the course, students should be able to:
 
 - [Practical 5: Mutation, migration and linkage disequilibrium](tutorials/mutation_migration_ld.qmd) — deterministic expectations, haplotypes, admixture and recombination.
 
+- [Practical 6: Genetic drift in finite populations](tutorials/genetic_drift.qmd) — neutral sampling, diversity loss and fixation.
+- [Practical 7: Selection, fitness and dominance](tutorials/selection_fitness.qmd) — selection recursions, balancing selection and finite realizations.
+
 ## Interactive Apps
 
 The repository includes the following R/Shiny app source files for local use. These apps are not currently configured for deployment.

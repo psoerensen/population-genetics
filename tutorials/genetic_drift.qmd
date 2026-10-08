@@ -1,0 +1,193 @@
+---
+title: "Genetic drift in finite populations"
+subtitle: "Population Genetics Practical 6: Neutral expectations and stochastic realizations"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Explain neutral allele-copy sampling; calculate its conditional mean and variance; compare small finite populations; distinguish expected heterozygosity loss from an individual trajectory; and interpret fixation, loss and effective population size carefully.
+
+Continue from [Practical 5](mutation_migration_ld.qmd) and the slides on [random genetic drift](../slides/introduction_population_genetics.qmd#random-genetic-drift-simulation-results). Use base R. All simulations are small, seeded teaching experiments; they are not estimates for a species or a broad calibration study.
+
+## 1. Define a neutral Wright–Fisher model
+
+Take a fixed population of $N$ diploid individuals, hence $2N$ allele copies. Generations do not overlap. The next generation's copies are sampled independently with replacement from a neutral parental pool at A frequency $p_t$:
+
+$$K_{t+1}\mid p_t\sim\operatorname{Binomial}(2N,p_t),\qquad
+p_{t+1}=K_{t+1}/(2N).$$
+
+There is no mutation, migration or selection. This single-locus model does not generate chromosome inheritance, pedigrees, sex roles or individual phenotypes. It is an allele-count sampling model, not a complete breeding population.
+
+Its conditional moments are
+
+$$E(p_{t+1}\mid p_t)=p_t,\qquad
+\operatorname{Var}(p_{t+1}\mid p_t)=\frac{p_t(1-p_t)}{2N}.$$
+
+Neutrality preserves the expected frequency, while finite realizations fluctuate.
+
+## 2. Verify the moments by exact enumeration
+
+For $N=2$ and $p=0.25$, enumerate all five possible allele counts. No simulation is needed to check the model's mean and variance.
+
+```{r}
+#| label: exact-drift-moments
+N_small <- 2L
+p0 <- .25
+counts <- 0:(2*N_small)
+probability <- dbinom(counts,size=2*N_small,prob=p0)
+next_frequency <- counts/(2*N_small)
+mean_next <- sum(probability*next_frequency)
+variance_next <- sum(probability*(next_frequency-mean_next)^2)
+knitr::kable(data.frame(A_copies=counts,p_A=next_frequency,
+                       probability=probability),digits=4)
+c(expected_p_A=mean_next,variance=variance_next)
+stopifnot(abs(sum(probability)-1)<1e-12,
+          abs(mean_next-p0)<1e-12,
+          abs(variance_next-p0*(1-p0)/(2*N_small))<1e-12)
+```
+
+**Question 1.** If the expected frequency stays 0.25, why is the next realized frequency not necessarily 0.25?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Expectation averages possible samples. With four copies, realized frequencies lie on 0, 0.25, 0.5, 0.75 and 1. The expected value is a mean over possible outcomes, not a guaranteed realization. A neutral trajectory can rise, fall or reach a boundary.
+:::
+
+## 3. Compare population sizes
+
+```{r}
+#| label: drift-trajectories
+neutral_trajectory <- function(N,p0,generations) {
+  stopifnot(length(N)==1L,N>=1,N==as.integer(N),
+            length(p0)==1L,is.finite(p0),p0>=0,p0<=1,
+            generations>=0,generations==as.integer(generations))
+  p <- numeric(generations+1L)
+  p[1] <- p0
+  for(t in seq_len(generations)) p[t+1L] <- rbinom(1,2*N,p[t])/(2*N)
+  p
+}
+set.seed(20261008)
+generations <- 60L
+replicates <- 20L
+sizes <- c(25L,250L)
+trajectories <- lapply(sizes,function(N) {
+  replicate(replicates,neutral_trajectory(N,.5,generations))
+})
+stopifnot(all(vapply(trajectories,function(z) all(z>=0 & z<=1),logical(1))))
+```
+
+```{r}
+#| label: fig-drift-trajectories
+#| fig-cap: "Twenty seeded neutral trajectories for each model size, starting at A frequency 0.5."
+#| fig-width: 9
+#| fig-height: 5
+local({
+  old <- par(mfrow=c(1,2)); on.exit(par(old))
+  for(j in seq_along(sizes)) {
+    matplot(0:generations,trajectories[[j]],type="l",lty=1,
+            col=adjustcolor("#247BA0",alpha.f=.45),ylim=c(0,1),
+            xlab="Generation",ylab="A frequency",main=paste("N =",sizes[j]))
+    abline(h=.5,lty=2,col="#B65C39")
+  }
+})
+```
+
+**Question 2.** Why do smaller populations fluctuate more strongly? Is the average of these 20 runs guaranteed to equal 0.5 at every step?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+The conditional variance scales as $1/(2N)$. A finite average of simulated trajectories also has sampling variation, so it is not guaranteed to equal the theoretical expectation. The two panels are illustrations of that model, not evidence about a real population's demographic history.
+:::
+
+## 4. Track gene diversity
+
+For the random-union diversity $H_t=2p_t(1-p_t)$,
+
+$$E(H_{t+1}\mid p_t)=\left(1-\frac{1}{2N}\right)H_t,$$
+
+so, from a fixed initial frequency,
+
+$$E(H_t)=H_0\left(1-\frac{1}{2N}\right)^t.$$
+
+This is frequency-based gene diversity, not the observed heterozygote fraction of individually simulated genotypes.
+
+```{r}
+#| label: exact-diversity-loss
+expected_H_next <- sum(probability*2*next_frequency*(1-next_frequency))
+stopifnot(abs(expected_H_next-(1-1/(2*N_small))*2*p0*(1-p0))<1e-12)
+expected_H_next
+```
+
+```{r}
+#| label: fig-drift-diversity
+#| fig-cap: "Mean gene diversity of the toy trajectories versus the exact neutral expectation; a finite mean need not lie on the theoretical curve."
+#| fig-width: 9
+#| fig-height: 5
+local({
+  old <- par(mfrow=c(1,2)); on.exit(par(old))
+  for(j in seq_along(sizes)) {
+    simulated_mean <- rowMeans(2*trajectories[[j]]*(1-trajectories[[j]]))
+    theoretical <- .5*(1-1/(2*sizes[j]))^(0:generations)
+    plot(0:generations,simulated_mean,type="l",ylim=c(0,.55),
+         col="#247BA0",lwd=2,xlab="Generation",ylab="Gene diversity",
+         main=paste("N =",sizes[j]))
+    lines(0:generations,theoretical,col="#B65C39",lty=2,lwd=2)
+    legend("topright",c("20-run mean","Model expectation"),
+           col=c("#247BA0","#B65C39"),lty=c(1,2),bty="n")
+  }
+})
+```
+
+**Question 3.** Must gene diversity decline at every step of every trajectory?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. A frequency moving toward 0.5 increases gene diversity in that realization. The decline applies to the expectation over neutral sampling, not a monotone constraint on each path.
+:::
+
+## 5. Interpret fixation and loss
+
+Without mutation or migration, frequencies 0 and 1 are absorbing. For this finite neutral model, eventual fixation probability of A is its initial frequency. Reaching fixation by a specified short horizon is a different quantity; runs still segregating at that horizon must not be counted as losses.
+
+```{r}
+#| label: boundary-outcomes
+outcomes <- t(vapply(trajectories,function(z) {
+  final <- z[nrow(z),]
+  c(A_lost=sum(final==0),A_fixed=sum(final==1),segregating=sum(final>0 & final<1))
+},numeric(3)))
+rownames(outcomes) <- paste0("N=",sizes)
+knitr::kable(outcomes)
+stopifnot(all(rowSums(outcomes)==replicates),
+          all(neutral_trajectory(10,0,5)==0),
+          all(neutral_trajectory(10,1,5)==1))
+```
+
+### Model size and effective population size
+
+In this ideal model $N$ specifies the sampling variance. A real population's census size need not equal the effective size governing drift. Unequal reproductive success, sex ratios, overlapping generations and demographic changes can alter the relevant effective size. Its estimation needs a named method and sampling assumptions; these toy trajectories do not estimate it.
+
+## Exercises
+
+1. Compare conditional variance at $p=0.5$ for $N=25$ and $N=250$.
+2. Calculate expected gene diversity after 60 generations at those sizes.
+3. Start a neutral model at fixation. Explain which omitted processes could restore a missing allele.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+data.frame(N=sizes,conditional_variance=.5*.5/(2*sizes),
+           expected_H_after_60=.5*(1-1/(2*sizes))^60)
+```
+The smaller model has ten times the conditional sampling variance. Mutation can introduce an allele and migration can bring it from another pool; neither is present in the neutral recursion. A boundary outcome in this model does not imply permanent loss from every real population.
+:::
+
+## App and package connections
+
+The existing [drift Shiny app](../apps/drift_simulation.R) is an optional local interface with its existing dependencies; this practical does not change or qualify the app. `gpop` owns population expectations and estimators, while biological population simulation belongs in `gsim`. The base-R sampler here is a one-locus teaching illustration, not a new package primitive.
+
+Next, [Practical 7](selection_fitness.qmd) adds genotype fitness and compares deterministic selection with finite-population sampling.

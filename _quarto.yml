@@ -8,6 +8,8 @@ project:
     - tutorials/structure_mating_inbreeding.qmd
     - tutorials/genetic_diversity.qmd
     - tutorials/mutation_migration_ld.qmd
+    - tutorials/genetic_drift.qmd
+    - tutorials/selection_fitness.qmd
     - slides/introduction_population_genetics.qmd
     - slides/introduction_population_genetics_narrated.qmd
   resources:
@@ -36,6 +38,10 @@ website:
             href: tutorials/genetic_diversity.html
           - text: "5. Mutation, migration and LD"
             href: tutorials/mutation_migration_ld.html
+          - text: "6. Genetic drift"
+            href: tutorials/genetic_drift.html
+          - text: "7. Selection and fitness"
+            href: tutorials/selection_fitness.html
       - text: "qgteach"
         href: https://psoerensen.github.io/qgteach/
 

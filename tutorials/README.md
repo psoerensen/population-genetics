@@ -9,6 +9,9 @@
 
 - [Mutation, migration and linkage disequilibrium](mutation_migration_ld.qmd): Practical 5, allele and haplotype recursions.
 
+- [Genetic drift in finite populations](genetic_drift.qmd): Practical 6, neutral sampling and diversity loss.
+- [Selection, fitness and dominance](selection_fitness.qmd): Practical 7, selection expectations and finite realizations.
+
 All use base R and hypothetical data, with no required downloads or package installations. gpop links refer to its existing teaching examples, not proposed scientific APIs.
 
 Render an individual page from the repository root:

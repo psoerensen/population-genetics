@@ -1,0 +1,208 @@
+---
+title: "Selection, fitness and dominance"
+subtitle: "Population Genetics Practical 7: Allele-frequency change and finite-population outcomes"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show R code"
+    embed-resources: true
+editor: source
+execute:
+  error: false
+---
+
+## Learning objectives
+
+Specify a selection life cycle; calculate genotype weighting and allele-frequency change; compare fitness dominance models; identify a heterozygote-advantage equilibrium; and distinguish a selected allele's deterministic trajectory from its finite-population fate.
+
+Continue from [Practical 6](genetic_drift.qmd). Follow the slides on [fitness](../slides/introduction_population_genetics.qmd#natural-selection-and-fitness), [the general selection model](../slides/introduction_population_genetics.qmd#general-model-of-selection) and [balancing selection](../slides/introduction_population_genetics.qmd#balancing-selection-maintains-genetic-diversity).
+
+Use base R and hypothetical parameters. A/a are allele labels; dominance here concerns **fitness**, not necessarily dominance for a measured trait such as body weight. No simulated trajectory is presented as a biological finding.
+
+## 1. State the life cycle
+
+Begin with random union of gametes at A frequency $p$, giving zygote proportions $p^2,2pq,q^2$. Apply genotype fitness weights $w_{AA},w_{Aa},w_{aa}$ to their reproductive contributions. Count A in the selected pool, then form the next zygotes by random mating. There is no mutation or migration.
+
+$$\bar w=p^2w_{AA}+2pqw_{Aa}+q^2w_{aa},$$
+$$p'=\frac{p^2w_{AA}+pqw_{Aa}}{\bar w}.$$
+
+Weights describe relative contribution under this model. If the mean contribution is zero, a next-generation pool is undefined. Multiplying every fitness by the same positive constant leaves the allele-frequency recursion unchanged.
+
+```{r}
+#| label: selection-step
+selection_step <- function(p,fitness) {
+  stopifnot(length(p)==1L,is.finite(p),p>=0,p<=1,
+            identical(names(fitness),c("AA","Aa","aa")),
+            all(is.finite(fitness)),all(fitness>=0))
+  zygotes <- c(AA=p^2,Aa=2*p*(1-p),aa=(1-p)^2)
+  contribution <- zygotes*fitness
+  mean_fitness <- sum(contribution)
+  stopifnot(mean_fitness>0)
+  selected <- contribution/mean_fitness
+  list(p_next=unname(selected["AA"]+selected["Aa"]/2),
+       mean_fitness=mean_fitness,zygotes=zygotes,selected=selected)
+}
+fitness <- c(AA=1.2,Aa=1.1,aa=1)
+step <- selection_step(.5,fitness)
+knitr::kable(rbind(Before_selection=step$zygotes,
+                   Selected_contributions=step$selected),digits=4)
+step$p_next
+stopifnot(abs(step$p_next-23/44)<1e-12,
+          abs(selection_step(.3,c(AA=1,Aa=1,aa=1))$p_next-.3)<1e-12,
+          abs(selection_step(.5,10*fitness)$p_next-step$p_next)<1e-12)
+```
+
+**Question 1.** Are the selected contribution proportions automatically HWE proportions at the new frequency?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Genotype-dependent weighting changes the selected pool's proportions. Random union of its gametes gives HWE expectations for the next zygote stage. The stage at which frequencies are defined matters; selection can recur after that stage.
+:::
+
+## 2. Compare fitness dominance
+
+For a beneficial A allele, define $w_{AA}=1+s$, $w_{Aa}=1+hs$, $w_{aa}=1$. Here $s>0$ is its homozygote advantage and $h$ specifies heterozygote fitness: 0 recessive, 0.5 intermediate, and 1 dominant in this parameterization.
+
+```{r}
+#| label: dominance-trajectories
+selection_trajectory <- function(p0,fitness,generations) {
+  p <- numeric(generations+1L)
+  p[1] <- p0
+  for(t in seq_len(generations)) p[t+1L] <- selection_step(p[t],fitness)$p_next
+  p
+}
+s <- .2
+h_values <- c(Recessive=0,Intermediate=.5,Dominant=1)
+fitness_models <- lapply(h_values,function(h) c(AA=1+s,Aa=1+h*s,aa=1))
+trajectories <- vapply(fitness_models,function(w) selection_trajectory(.05,w,80),
+                       numeric(81))
+```
+
+```{r}
+#| label: fig-dominance-selection
+#| fig-cap: "Deterministic selection trajectories from A frequency 0.05 at three fitness-dominance assumptions."
+matplot(0:80,trajectories,type="l",lty=1,lwd=2,ylim=c(0,1),
+        col=c("#247BA0","#86B7A3","#B65C39"),
+        xlab="Generation",ylab="A frequency")
+legend("topleft",colnames(trajectories),lty=1,lwd=2,
+       col=c("#247BA0","#86B7A3","#B65C39"),bty="n")
+```
+
+**Question 2.** Why can a rare beneficial recessive allele increase slowly?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+Most of its copies occur in heterozygotes when it is rare. Under the recessive fitness model those heterozygotes have no advantage, and advantageous AA homozygotes are uncommon. Conversely, near fixation a dominant beneficial allele can leave the alternative allele hidden in equally fit heterozygotes, slowing its removal.
+:::
+
+## 3. Heterozygote advantage can maintain a polymorphism
+
+Suppose $w_{AA}=1-s$, $w_{Aa}=1$, $w_{aa}=1-t$, with $s,t>0$. The interior equilibrium is
+
+$$p^*=\frac{t}{s+t}.$$
+
+Both alleles can increase when rare because heterozygotes exceed either homozygote in fitness. This is one explicit balancing-selection model, not a claim that every polymorphism is maintained by selection.
+
+```{r}
+#| label: balancing-selection
+s_loss <- .2
+t_loss <- .4
+balanced_fitness <- c(AA=1-s_loss,Aa=1,aa=1-t_loss)
+p_star <- t_loss/(s_loss+t_loss)
+starts <- c(.1,.9)
+balanced_paths <- vapply(starts,function(p) {
+  selection_trajectory(p,balanced_fitness,60)
+},numeric(61))
+stopifnot(abs(selection_step(p_star,balanced_fitness)$p_next-p_star)<1e-12,
+          selection_step(.1,balanced_fitness)$p_next>.1,
+          selection_step(.9,balanced_fitness)$p_next<.9)
+p_star
+```
+
+```{r}
+#| label: fig-balanced-selection
+#| fig-cap: "Two deterministic trajectories approaching the heterozygote-advantage equilibrium under supplied fitnesses."
+matplot(0:60,balanced_paths,type="l",lty=1,lwd=2,ylim=c(0,1),
+        col=c("#247BA0","#B65C39"),xlab="Generation",ylab="A frequency")
+abline(h=p_star,lty=2)
+legend("bottomright",c("Start p=0.1","Start p=0.9","Equilibrium"),
+       col=c("#247BA0","#B65C39","black"),lty=c(1,1,2),bty="n")
+```
+
+**Question 3.** Does this deterministic equilibrium guarantee that both alleles persist in a finite population?
+
+::: {.callout-note collapse="true" title="Suggested answer"}
+No. Drift can still reach loss or fixation. Balancing selection changes the transition probabilities but does not create a missing allele when mutation and migration are absent. The deterministic model and finite-population model answer different questions.
+:::
+
+## 4. Combine selection with finite allele-copy sampling
+
+Use the selected-pool frequency as the probability of sampling $2N$ copies for the next generation:
+
+$$K_{t+1}\mid p_t\sim\operatorname{Binomial}(2N,p_{selected}(p_t)).$$
+
+This is a specified one-locus selection-plus-drift model. It does not simulate sex-specific mating, individual family sizes, chromosome recombination or breeding programme constraints.
+
+```{r}
+#| label: selection-and-drift
+selected_drift_trajectory <- function(N,p0,fitness,generations) {
+  stopifnot(N>=1,N==as.integer(N),generations>=0,
+            generations==as.integer(generations))
+  p <- numeric(generations+1L)
+  p[1] <- p0
+  for(t in seq_len(generations)) {
+    p_selected <- selection_step(p[t],fitness)$p_next
+    p[t+1L] <- rbinom(1,2*N,p_selected)/(2*N)
+  }
+  p
+}
+set.seed(20261009)
+N <- 50L
+w <- fitness_models$Intermediate
+selected_paths <- replicate(20,selected_drift_trajectory(N,.05,w,60))
+deterministic <- selection_trajectory(.05,w,60)
+stopifnot(all(selected_paths>=0 & selected_paths<=1))
+```
+
+```{r}
+#| label: fig-selected-drift
+#| fig-cap: "Twenty seeded selection-plus-drift trajectories and the deterministic selection path; the deterministic line is not the exact mean of the stochastic model."
+matplot(0:60,selected_paths,type="l",lty=1,ylim=c(0,1),
+        col=adjustcolor("#247BA0",alpha.f=.4),
+        xlab="Generation",ylab="A frequency")
+lines(0:60,deterministic,col="#B65C39",lwd=3)
+legend("topleft",c("Finite realizations","Deterministic selection"),
+       col=c("#247BA0","#B65C39"),lty=1,lwd=c(1,3),bty="n")
+final <- selected_paths[nrow(selected_paths),]
+c(A_lost=sum(final==0),A_fixed=sum(final==1),
+  segregating=sum(final>0 & final<1))
+```
+
+Conditional mean frequency is $p_{selected}(p_t)$. Selection is generally nonlinear, so averaging it over a random $p_t$ is not the same as applying it to the mean frequency. The deterministic line is therefore a useful comparison, not automatically the expected stochastic trajectory. The 20-run outcomes illustrate possible fates; they are not precise fixation-probability estimates.
+
+## Exercises
+
+1. Set every fitness to the same positive value. What happens to the deterministic frequency and the stochastic model?
+2. Reverse allele labels and swap the homozygote fitnesses. Verify the next A frequency becomes the complement.
+3. Use $w_{AA}=0.7,w_{Aa}=1,w_{aa}=0.9$. Calculate the balancing equilibrium.
+4. Explain why the beneficial allele can disappear in the finite runs and why selection cannot restore it at frequency zero.
+
+::: {.callout-note collapse="true" title="Suggested solutions"}
+```{r}
+selection_step(.4,c(AA=2,Aa=2,aa=2))$p_next
+reversed_fitness <- setNames(unname(fitness[c("aa","Aa","AA")]),
+                             c("AA","Aa","aa"))
+stopifnot(abs(selection_step(.7,reversed_fitness)$p_next-
+               (1-selection_step(.3,fitness)$p_next))<1e-12)
+example_equilibrium <- .1/(.3+.1)
+stopifnot(abs(selection_step(example_equilibrium,c(AA=.7,Aa=1,aa=.9))$p_next-
+               example_equilibrium)<1e-12)
+example_equilibrium
+```
+Equal fitnesses leave deterministic frequency unchanged and reduce the stochastic model to neutral drift. The balancing equilibrium is 0.25 under those specified fitnesses. Finite sampling can draw zero A copies even after selection; without mutation or migration, there are then no A copies for selection to favor.
+:::
+
+## App and package connections
+
+The existing [selection Shiny app](../apps/Selection_Simulator.R) is available for optional local exploration with its existing dependencies. This practical does not change or qualify that app, and the simple one-locus model does not establish a selective sweep at linked loci.
+
+`gpop` owns deterministic population expectations; biological simulation belongs in `gsim`; breeding objectives, selection policy and programme design belong in `gsel`. Natural-selection fitness weights are not automatically economic weights or estimated breeding values. These teaching calculations add no scientific package APIs.
